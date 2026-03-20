@@ -1,7 +1,9 @@
 use crate::models::Skill;
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseButton, MouseEventKind,
+    },
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -9,58 +11,72 @@ use fuzzy_matcher::FuzzyMatcher;
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState, Wrap},
 };
 use std::io;
 
 pub struct App {
     items: Vec<Skill>,
-    filtered_items: Vec<(Skill, i64)>,
+    filtered_items: Vec<(Skill, i64, Vec<usize>)>,
     state: TableState,
     search_input: String,
     matcher: fuzzy_matcher::skim::SkimMatcherV2,
+    last_search: String,
+    table_area: Rect,
 }
 
 impl App {
     pub fn new(items: Vec<Skill>) -> Self {
-        let filtered_items: Vec<(Skill, i64)> = items.iter().map(|s| (s.clone(), 0)).collect();
         let mut state = TableState::default();
         state.select(Some(0));
 
-        App {
-            items,
-            filtered_items,
+        Self {
+            items: items.clone(),
+            filtered_items: items.iter().map(|s| (s.clone(), 0, Vec::new())).collect(),
             state,
             search_input: String::new(),
             matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+            last_search: String::new(),
+            table_area: Rect::default(),
         }
     }
 
-    fn filter(&mut self) {
-        if self.search_input.is_empty() {
-            self.filtered_items = self.items.iter().map(|s| (s.clone(), 0)).collect();
+    pub fn filter_items(&mut self) {
+        if self.search_input == self.last_search {
+            return;
+        }
+
+        self.filtered_items.clear();
+        let query = &self.search_input;
+
+        if query.is_empty() {
+            self.filtered_items = self
+                .items
+                .iter()
+                .map(|skill| (skill.clone(), 0, Vec::new()))
+                .collect();
         } else {
-            let mut results: Vec<(Skill, i64)> = self
+            self.filtered_items = self
                 .items
                 .iter()
                 .filter_map(|skill| {
-                    let tags_str = skill.tags.join(" ");
-                    let haystack = format!(
+                    let combined = format!(
                         "{} {} {} {}",
-                        skill.name, skill.description, tags_str, skill.path
+                        skill.name,
+                        skill.description,
+                        skill.tags.join(" "),
+                        skill.path
                     );
-
                     self.matcher
-                        .fuzzy_match(&haystack, &self.search_input)
-                        .map(|score| (skill.clone(), score))
+                        .fuzzy_indices(&combined, query)
+                        .map(|(score, indices)| (skill.clone(), score, indices))
                 })
                 .collect();
 
-            results.sort_by(|a, b| b.1.cmp(&a.1));
-            self.filtered_items = results;
+            self.filtered_items.sort_by(|a, b| b.1.cmp(&a.1));
         }
 
         if !self.filtered_items.is_empty() {
@@ -68,9 +84,14 @@ impl App {
         } else {
             self.state.select(None);
         }
+
+        self.last_search = self.search_input.clone();
     }
 
-    fn next(&mut self) {
+    pub fn next(&mut self) {
+        if self.filtered_items.is_empty() {
+            return;
+        }
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.filtered_items.len() - 1 {
@@ -84,7 +105,10 @@ impl App {
         self.state.select(Some(i));
     }
 
-    fn previous(&mut self) {
+    pub fn previous(&mut self) {
+        if self.filtered_items.is_empty() {
+            return;
+        }
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -98,10 +122,94 @@ impl App {
         self.state.select(Some(i));
     }
 
-    fn selected_path(&self) -> Option<String> {
+    pub fn select_index(&mut self, index: usize) {
+        if index < self.filtered_items.len() {
+            self.state.select(Some(index));
+        }
+    }
+
+    pub fn selected_skill(&self) -> Option<&Skill> {
         self.state
             .selected()
-            .and_then(|i| self.filtered_items.get(i).map(|(s, _)| s.path.clone()))
+            .and_then(|i| self.filtered_items.get(i))
+            .map(|(skill, _, _)| skill)
+    }
+}
+
+fn highlight_text(s: &str, indices: &[usize]) -> Line<'static> {
+    if indices.is_empty() {
+        return Line::from(s.to_string());
+    }
+
+    let mut spans = Vec::new();
+    let mut current_pos = 0;
+    let chars: Vec<char> = s.chars().collect();
+
+    let mut sorted_indices = indices.to_vec();
+    sorted_indices.sort();
+    sorted_indices.dedup();
+
+    for &idx in &sorted_indices {
+        if idx >= chars.len() {
+            continue;
+        }
+
+        if current_pos < idx {
+            spans.push(Span::styled(
+                chars[current_pos..idx].iter().collect::<String>(),
+                Style::default(),
+            ));
+        }
+
+        spans.push(Span::styled(
+            chars[idx].to_string(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ));
+
+        current_pos = idx + 1;
+    }
+
+    if current_pos < chars.len() {
+        spans.push(Span::styled(
+            chars[current_pos..].iter().collect::<String>(),
+            Style::default(),
+        ));
+    }
+
+    Line::from(spans)
+}
+
+fn calculate_clicked_index(
+    mouse_y: u16,
+    table_rect: Rect,
+    table_state: &TableState,
+    item_count: usize,
+) -> Option<usize> {
+    let table_top = table_rect.top();
+    let table_bottom = table_rect.bottom();
+
+    if mouse_y < table_top || mouse_y >= table_bottom {
+        return None;
+    }
+
+    let header_height = 1u16;
+    let border_height = 1u16;
+
+    if mouse_y < table_top + border_height + header_height {
+        return None;
+    }
+
+    let clicked_row = (mouse_y - table_top - border_height - header_height) as usize;
+
+    let offset = table_state.offset();
+    let absolute_index = offset + clicked_row;
+
+    if absolute_index < item_count {
+        Some(absolute_index)
+    } else {
+        None
     }
 }
 
@@ -113,7 +221,9 @@ pub fn run_tui(items: Vec<Skill>) -> Result<Option<String>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new(items);
-    let res = run_app(&mut terminal, &mut app);
+    app.filter_items();
+
+    let result = run_app(&mut terminal, &mut app);
 
     disable_raw_mode()?;
     execute!(
@@ -123,13 +233,7 @@ pub fn run_tui(items: Vec<Skill>) -> Result<Option<String>> {
     )?;
     terminal.show_cursor()?;
 
-    match res {
-        Ok(path) => Ok(path),
-        Err(err) => {
-            eprintln!("Error: {:?}", err);
-            Ok(None)
-        }
-    }
+    result
 }
 
 fn run_app(
@@ -137,20 +241,27 @@ fn run_app(
     app: &mut App,
 ) -> Result<Option<String>> {
     loop {
-        terminal.draw(|f| ui(f, app))?;
+        terminal.draw(|f| render(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
-            match key.code {
+        match event::read()? {
+            Event::Key(key) => match key.code {
                 KeyCode::Char(c) => {
-                    if key.modifiers == KeyModifiers::CONTROL && c == 'c' {
-                        return Ok(None);
-                    }
                     app.search_input.push(c);
-                    app.filter();
+                    app.filter_items();
                 }
                 KeyCode::Backspace => {
                     app.search_input.pop();
-                    app.filter();
+                    app.filter_items();
+                }
+                KeyCode::Enter => {
+                    let result = app
+                        .state
+                        .selected()
+                        .map(|i| app.filtered_items[i].0.path.clone());
+                    return Ok(result);
+                }
+                KeyCode::Esc => {
+                    return Ok(None);
                 }
                 KeyCode::Up => {
                     app.previous();
@@ -158,86 +269,264 @@ fn run_app(
                 KeyCode::Down => {
                     app.next();
                 }
-                KeyCode::Enter => {
-                    return Ok(app.selected_path());
+                _ => {}
+            },
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::ScrollUp => {
+                    app.previous();
                 }
-                KeyCode::Esc => {
-                    return Ok(None);
+                MouseEventKind::ScrollDown => {
+                    app.next();
+                }
+                MouseEventKind::Down(button) => {
+                    if button == MouseButton::Left {
+                        if let Some(index) = calculate_clicked_index(
+                            mouse.row,
+                            app.table_area,
+                            &app.state,
+                            app.filtered_items.len(),
+                        ) {
+                            app.select_index(index);
+                        }
+                    }
                 }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Min(5), Constraint::Length(3)])
-        .split(f.area());
+fn build_detail_lines(skill: &Skill, panel_width: u16) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    let separator_width = (panel_width.saturating_sub(2)) as usize;
+    let separator = "─".repeat(separator_width);
 
-    let header_cells = ["序号", "名称", "描述", "标签"]
-        .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Yellow)));
-    let header = Row::new(header_cells)
-        .style(Style::default().add_modifier(Modifier::BOLD))
-        .bottom_margin(1);
+    lines.push(Line::from(Span::styled(
+        "基本信息",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        separator.clone(),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "名称: ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(skill.name.clone()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(
+            "路径: ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(skill.path.clone()),
+    ]));
+
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(Span::styled(
+        "标签",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        separator.clone(),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    if skill.tags.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "无标签",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        let tags_text = skill.tags.join(" • ");
+        lines.push(Line::from(tags_text));
+    }
+
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(Span::styled(
+        "执行配置",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        separator.clone(),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    if let Some(ref template) = skill.command_template {
+        lines.push(Line::from(vec![
+            Span::styled(
+                "模板: ",
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(template.clone()),
+        ]));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "无执行模板",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(Span::styled(
+        "描述",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(Span::styled(
+        separator,
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    lines.push(Line::from(skill.description.clone()));
+
+    lines
+}
+
+fn render(f: &mut Frame, app: &mut App) {
+    let size = f.area();
+
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(size);
+
+    let table_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
+        .split(main_chunks[0]);
+
+    let header = Row::new(vec![
+        Cell::from("序号").style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("名称").style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("描述").style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])
+    .bottom_margin(1);
 
     let rows: Vec<Row> = app
         .filtered_items
         .iter()
         .enumerate()
-        .map(|(i, (skill, _))| {
-            let tags = skill.tags.join(", ");
-            Row::new(vec![
-                Cell::from(format!("{}", i + 1)),
-                Cell::from(skill.name.clone()),
-                Cell::from(skill.description.clone()),
-                Cell::from(tags),
-            ])
+        .map(|(i, (skill, _, indices))| {
+            let index_cell = Cell::from(format!("{}", i + 1));
+
+            let name_line = highlight_text(&skill.name, indices);
+            let name_cell = Cell::from(name_line);
+
+            let desc_line = highlight_text(&skill.description, indices);
+            let desc_cell = Cell::from(desc_line);
+
+            let is_selected = app.state.selected() == Some(i);
+            let style = if is_selected {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+
+            Row::new(vec![index_cell, name_cell, desc_cell]).style(style)
         })
         .collect();
 
     let table = Table::new(
         rows,
         [
-            Constraint::Length(6),
-            Constraint::Percentage(25),
-            Constraint::Percentage(45),
-            Constraint::Percentage(20),
+            Constraint::Length(5),
+            Constraint::Percentage(40),
+            Constraint::Percentage(55),
         ],
     )
     .header(header)
     .block(
-        Block::default().borders(Borders::ALL).title(Span::styled(
-            " 技能列表 ",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )),
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(Span::styled(
+                " 技能列表 ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
     )
     .row_highlight_style(
         Style::default()
             .bg(Color::DarkGray)
+            .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
     )
     .highlight_symbol("▶ ");
 
-    f.render_stateful_widget(table, chunks[0], &mut app.state.clone());
+    f.render_stateful_widget(table, table_chunks[0], &mut app.state);
+    app.table_area = table_chunks[0];
 
-    let search_block = Block::default().borders(Borders::ALL).title(Span::styled(
-        " 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
-        Style::default().fg(Color::Green),
-    ));
+    let detail_lines = if let Some(skill) = app.selected_skill() {
+        build_detail_lines(skill, table_chunks[1].width)
+    } else {
+        vec![Line::from(Span::styled(
+            "未选择技能",
+            Style::default().fg(Color::DarkGray),
+        ))]
+    };
+
+    let detail_paragraph = Paragraph::new(detail_lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(Span::styled(
+                    " 技能详情 ",
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        )
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(detail_paragraph, table_chunks[1]);
+
+    let search_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .title(Span::styled(
+            " 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
+            Style::default().fg(Color::Green),
+        ));
     let search_text = format!("> {}█", app.search_input);
     let search_paragraph = Paragraph::new(search_text).block(search_block);
-    f.render_widget(search_paragraph, chunks[1]);
-
-    let status_text = format!("共 {} 个技能", app.filtered_items.len());
-    let status = Paragraph::new(Span::styled(status_text, Style::default().fg(Color::Gray)));
-    let status_area = Layout::default()
-        .constraints([Constraint::Length(1)])
-        .split(chunks[1])[0];
-    f.render_widget(status, status_area);
+    f.render_widget(search_paragraph, main_chunks[1]);
 }
