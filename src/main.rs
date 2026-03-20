@@ -4,6 +4,7 @@ mod models;
 mod parser;
 mod path_utils;
 mod scanner;
+mod ui;
 
 use anyhow::Result;
 

@@ -1,7 +1,7 @@
 use crate::index::{IndexManager, SkillSearcher, init_config, load_config};
 use crate::models::Skill;
+use crate::ui::run_tui;
 use anyhow::Result;
-use bat::PrettyPrinter;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Table, presets::UTF8_FULL};
 use std::path::PathBuf;
@@ -39,6 +39,12 @@ enum Commands {
 
         #[arg(short, long, help = "显示详细信息")]
         detailed: bool,
+    },
+
+    #[command(about = "交互式选择技能 (TUI)")]
+    Pick {
+        #[arg(short, long, default_value = ".")]
+        path: String,
     },
 
     #[command(about = "搜索技能")]
@@ -121,6 +127,29 @@ pub fn run() -> Result<()> {
                 print_detailed_table(&index.skills);
             } else {
                 print_simple_table(&index.skills);
+            }
+        }
+
+        Commands::Pick { path } => {
+            let path_buf = PathBuf::from(&path);
+            let config = load_config(&path_buf)?;
+            let manager = IndexManager::new(config, &path_buf);
+
+            let index = match manager.load_index()? {
+                Some(idx) => idx,
+                None => {
+                    eprintln!("索引不存在，请先运行 'nanoskills sync'");
+                    return Ok(());
+                }
+            };
+
+            match run_tui(index.skills)? {
+                Some(selected_path) => {
+                    println!("{}", selected_path);
+                }
+                None => {
+                    eprintln!("未选择任何技能");
+                }
             }
         }
 
@@ -277,13 +306,5 @@ fn print_detailed_table(skills: &[Skill]) {
 
 fn print_skill_yaml(skill: &Skill) {
     let yaml_str = serde_yaml::to_string(skill).unwrap_or_default();
-    PrettyPrinter::new()
-        .input_from_bytes(yaml_str.as_bytes())
-        .language("yaml")
-        .true_color(true)
-        .header(false)
-        .line_numbers(false)
-        .grid(false)
-        .print()
-        .unwrap();
+    println!("{}", yaml_str);
 }
