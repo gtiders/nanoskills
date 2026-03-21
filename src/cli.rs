@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[command(version)]
 pub struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Parser)]
@@ -72,7 +72,26 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init { path, force } => {
+        None => {
+            let index = match load_index()? {
+                Some(idx) => idx,
+                None => {
+                    eprintln!("{}", t!("cli.index_not_found"));
+                    return Ok(());
+                }
+            };
+
+            match run_tui(index.skills)? {
+                Some(skill) => {
+                    println!("{}", serde_yaml::to_string(&skill)?);
+                }
+                None => {
+                    eprintln!("{}", t!("ui.no_selection"));
+                }
+            }
+        }
+
+        Some(Commands::Init { path, force }) => {
             let path_buf = PathBuf::from(&path);
             match init_config(&path_buf, force) {
                 Ok(config) => {
@@ -90,17 +109,17 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Sync { path, strict } => {
+        Some(Commands::Sync { path, strict }) => {
             let path_buf = PathBuf::from(&path);
             let result = run_sync(&path_buf, strict)?;
             print_sync_result(&result);
         }
 
-        Commands::List {
+        Some(Commands::List {
             path: _,
             json,
             detailed,
-        } => {
+        }) => {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
@@ -124,7 +143,7 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Pick { path: _ } => {
+        Some(Commands::Pick { path: _ }) => {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
@@ -143,7 +162,7 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Search { query, json, limit } => {
+        Some(Commands::Search { query, json, limit }) => {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
