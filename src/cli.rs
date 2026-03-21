@@ -83,7 +83,8 @@ pub fn run() -> Result<()> {
 
             match run_tui(index.skills)? {
                 Some(skill) => {
-                    println!("{}", serde_yaml::to_string(&skill)?);
+                    print_skill_yaml_highlighted(&skill);
+                    println!("\n📁 Path: {}", skill.path);
                 }
                 None => {
                     eprintln!("{}", t!("ui.no_selection"));
@@ -154,7 +155,8 @@ pub fn run() -> Result<()> {
 
             match run_tui(index.skills)? {
                 Some(skill) => {
-                    println!("{}", serde_yaml::to_string(&skill)?);
+                    print_skill_yaml_highlighted(&skill);
+                    println!("\n📁 Path: {}", skill.path);
                 }
                 None => {
                     eprintln!("{}", t!("ui.no_selection"));
@@ -282,4 +284,39 @@ fn print_detailed_table(skills: &[Skill]) {
 
     println!("{table}");
     println!("{}", t!("cli.total_skills", count = skills.len()));
+}
+
+fn print_skill_yaml_highlighted(skill: &Skill) {
+    let yaml_str = serde_yaml::to_string(skill).unwrap_or_default();
+
+    use std::sync::OnceLock;
+    use syntect::easy::HighlightLines;
+    use syntect::highlighting::ThemeSet;
+    use syntect::parsing::SyntaxSet;
+    use syntect::util::LinesWithEndings;
+
+    static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
+    static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
+
+    let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
+    let theme_set = THEME_SET.get_or_init(ThemeSet::load_defaults);
+
+    let syntax = syntax_set
+        .find_syntax_by_extension("yaml")
+        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+
+    let theme = &theme_set.themes["base16-ocean.dark"];
+    let mut h = HighlightLines::new(syntax, theme);
+
+    for line in LinesWithEndings::from(&yaml_str) {
+        let ranges: Vec<(syntect::highlighting::Style, &str)> =
+            h.highlight_line(line, syntax_set).unwrap_or_default();
+
+        for (style, text) in ranges {
+            let color =
+                termion::color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+            print!("{}{}", termion::color::Fg(color), text);
+        }
+    }
+    print!("{}", termion::color::Fg(termion::color::Reset));
 }
