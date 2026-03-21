@@ -3,6 +3,7 @@ use crate::models::{Index, ParseError, Skill};
 use crate::parser::HeaderParser;
 use crate::scanner::scan_files;
 use anyhow::Result;
+use rust_i18n::t;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -67,14 +68,26 @@ pub fn run_sync(local_dir: &Path, strict: bool) -> Result<SyncResult> {
 
 pub fn print_sync_result(result: &SyncResult) {
     println!(
-        "✅ 同步完成！耗时 {}ms，扫描了 {} 个文件，成功索引 {} 个技能。",
-        result.elapsed_ms, result.total_files, result.skills_count
+        "{}",
+        t!(
+            "cli.sync_complete",
+            time = result.elapsed_ms,
+            files = result.total_files,
+            skills = result.skills_count
+        )
     );
 
     if !result.errors.is_empty() {
-        println!("\n⚠️  以下文件解析失败：");
+        println!("{}", t!("cli.parse_errors"));
         for error in &result.errors {
-            println!("  • {} - {}", error.path, error.reason);
+            println!(
+                "{}",
+                t!(
+                    "cli.parse_error_item",
+                    path = error.path,
+                    reason = error.reason
+                )
+            );
         }
     }
 }

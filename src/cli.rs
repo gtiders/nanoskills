@@ -5,6 +5,7 @@ use crate::ui::run_tui;
 use anyhow::Result;
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, Table, presets::UTF8_FULL};
+use rust_i18n::t;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -18,51 +19,51 @@ pub struct Cli {
 
 #[derive(Parser)]
 enum Commands {
-    #[command(about = "初始化配置文件")]
+    #[command(about = "Initialize configuration file")]
     Init {
         #[arg(short, long, default_value = ".")]
         path: String,
 
-        #[arg(short = 'f', long, help = "强制覆盖已存在的配置文件")]
+        #[arg(short = 'f', long, help = "Force overwrite existing configuration")]
         force: bool,
     },
 
-    #[command(about = "同步/构建索引")]
+    #[command(about = "Sync and build index")]
     Sync {
         #[arg(short, long, default_value = ".")]
         path: String,
 
-        #[arg(long, help = "严格模式：显示解析失败的文件")]
+        #[arg(long, help = "Strict mode: show parse errors")]
         strict: bool,
     },
 
-    #[command(about = "列出所有技能")]
+    #[command(about = "List all skills")]
     List {
         #[arg(short, long, default_value = ".")]
         path: String,
 
-        #[arg(short = 'j', long, help = "输出 JSON 格式（Agent 模式）")]
+        #[arg(short = 'j', long, help = "Output in JSON format (Agent mode)")]
         json: bool,
 
-        #[arg(short, long, help = "显示详细信息")]
+        #[arg(short, long, help = "Show detailed information")]
         detailed: bool,
     },
 
-    #[command(about = "交互式选择技能 (TUI)")]
+    #[command(about = "Interactive skill selection (TUI)")]
     Pick {
         #[arg(short, long, default_value = ".")]
         path: String,
     },
 
-    #[command(about = "搜索技能 (模糊匹配)")]
+    #[command(about = "Search skills (fuzzy match)")]
     Search {
         #[arg(required = true)]
         query: String,
 
-        #[arg(short = 'j', long, help = "输出 OpenAI Tools JSON 格式")]
+        #[arg(short = 'j', long, help = "Output in OpenAI Tools JSON format")]
         json: bool,
 
-        #[arg(short = 'l', long, help = "限制输出数量")]
+        #[arg(short = 'l', long, help = "Limit number of results")]
         limit: Option<usize>,
     },
 }
@@ -75,10 +76,13 @@ pub fn run() -> Result<()> {
             let path_buf = PathBuf::from(&path);
             match init_config(&path_buf, force) {
                 Ok(config) => {
-                    println!("✓ 配置文件已创建: {}/.agent-skills.yaml", path);
-                    println!("扫描路径: {:?}", config.scan_paths);
-                    println!("最大文件大小: {}", config.max_file_size);
-                    println!("搜索结果限制: {}", config.search_limit);
+                    println!("{}", t!("cli.config_created", path = path));
+                    println!(
+                        "{}",
+                        t!("cli.scan_paths", paths = format!("{:?}", config.scan_paths))
+                    );
+                    println!("{}", t!("cli.max_file_size", size = config.max_file_size));
+                    println!("{}", t!("cli.search_limit", limit = config.search_limit));
                 }
                 Err(e) => {
                     eprintln!("❌ {}", e);
@@ -100,7 +104,7 @@ pub fn run() -> Result<()> {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
-                    eprintln!("索引不存在，请先运行 'nanoskills sync'");
+                    eprintln!("{}", t!("cli.index_not_found"));
                     return Ok(());
                 }
             };
@@ -116,7 +120,7 @@ pub fn run() -> Result<()> {
                 print_detailed_table(&index.skills);
             } else {
                 print_skills_table(&index.skills);
-                println!("\n共 {} 个技能", index.skills.len());
+                println!("{}", t!("cli.total_skills", count = index.skills.len()));
             }
         }
 
@@ -124,7 +128,7 @@ pub fn run() -> Result<()> {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
-                    eprintln!("索引不存在，请先运行 'nanoskills sync'");
+                    eprintln!("{}", t!("cli.index_not_found"));
                     return Ok(());
                 }
             };
@@ -134,7 +138,7 @@ pub fn run() -> Result<()> {
                     println!("{}", serde_yaml::to_string(&skill)?);
                 }
                 None => {
-                    eprintln!("未选择任何技能");
+                    eprintln!("{}", t!("ui.no_selection"));
                 }
             }
         }
@@ -143,7 +147,7 @@ pub fn run() -> Result<()> {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
-                    eprintln!("索引不存在，请先运行 'nanoskills sync'");
+                    eprintln!("{}", t!("cli.index_not_found"));
                     return Ok(());
                 }
             };
@@ -163,21 +167,24 @@ pub fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&tools)?);
             } else {
                 if limited_results.is_empty() {
-                    println!("🔍 未找到匹配的技能");
+                    println!("{}", t!("cli.search_not_found"));
                     return Ok(());
                 }
 
                 println!(
-                    "🔍 找到 {} 个技能 (显示前 {} 个):\n",
-                    limited_results.len(),
-                    search_limit
+                    "{}",
+                    t!(
+                        "cli.search_found",
+                        count = limited_results.len(),
+                        limit = search_limit
+                    )
                 );
                 let skills: Vec<Skill> = limited_results
                     .iter()
                     .map(|(skill, _)| (*skill).clone())
                     .collect();
                 print_skills_table(&skills);
-                println!("\n💡 提示: 使用 'nanoskills pick' 交互式选择技能");
+                println!("{}", t!("cli.search_hint"));
             }
         }
     }
@@ -187,7 +194,7 @@ pub fn run() -> Result<()> {
 
 fn print_skills_table(skills: &[Skill]) {
     if skills.is_empty() {
-        println!("暂无技能");
+        println!("{}", t!("cli.no_skills"));
         return;
     }
 
@@ -196,7 +203,13 @@ fn print_skills_table(skills: &[Skill]) {
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "📁 路径"]);
+    table.set_header(vec![
+        t!("ui.table_header.index"),
+        t!("ui.table_header.name"),
+        t!("ui.table_header.description"),
+        t!("ui.table_header.tags"),
+        t!("ui.table_header.path"),
+    ]);
 
     for (i, skill) in skills.iter().enumerate() {
         let tags = skill.tags.join(", ");
@@ -214,7 +227,7 @@ fn print_skills_table(skills: &[Skill]) {
 
 fn print_detailed_table(skills: &[Skill]) {
     if skills.is_empty() {
-        println!("暂无技能");
+        println!("{}", t!("cli.no_skills"));
         return;
     }
 
@@ -223,7 +236,13 @@ fn print_detailed_table(skills: &[Skill]) {
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "📋 参数定义"]);
+    table.set_header(vec![
+        t!("ui.table_header.index"),
+        t!("ui.table_header.name"),
+        t!("ui.table_header.description"),
+        t!("ui.table_header.tags"),
+        t!("ui.table_header.parameters"),
+    ]);
 
     for (i, skill) in skills.iter().enumerate() {
         let tags = skill.tags.join(", ");
@@ -243,5 +262,5 @@ fn print_detailed_table(skills: &[Skill]) {
     }
 
     println!("{table}");
-    println!("\n共 {} 个技能", skills.len());
+    println!("{}", t!("cli.total_skills", count = skills.len()));
 }

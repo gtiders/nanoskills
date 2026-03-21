@@ -1,0 +1,44 @@
+ui:
+  list_title: "📦 Skills List"
+  preview_title: "📄 Skill Preview"
+  search_prompt: "🔍 Fuzzy Search (Type / ↑↓ Navigate / Enter Confirm)"
+  table_header:
+    index: "#"
+    name: "📝 Name"
+    description: "📖 Description"
+    tags: "🏷️ Tags"
+    path: "📁 Path"
+    parameters: "📋 Parameters"
+  no_selection: "No skill selected"
+  
+cli:
+  config_created: "✓ Configuration file created: %{path}/.agent-skills.yaml"
+  scan_paths: "Scan paths: %{paths}"
+  max_file_size: "Max file size: %{size}"
+  search_limit: "Search result limit: %{limit}"
+  config_exists: "❌ Configuration file already exists: %{path}\nUse --force to overwrite"
+  index_not_found: "Index not found, please run 'nanoskills sync' first"
+  sync_complete: "✅ Sync complete! Elapsed %{time}ms, scanned %{files} files, indexed %{skills} skills."
+  parse_errors: "\n⚠️  Parse errors:"
+  parse_error_item: "  • %{path} - %{reason}"
+  no_skills: "No skills found"
+  total_skills: "\nTotal %{count} skills"
+  search_found: "🔍 Found %{count} skills (showing top %{limit}):\n"
+  search_not_found: "🔍 No matching skills found"
+  search_hint: "\n💡 Tip: Use 'nanoskills pick' for interactive selection"
+  
+  commands:
+    init: "Initialize configuration file"
+    sync: "Sync and build index"
+    list: "List all skills"
+    pick: "Interactive skill selection (TUI)"
+    search: "Search skills (fuzzy match)"
+    
+  args:
+    path: "Target path"
+    force: "Force overwrite existing configuration"
+    strict: "Strict mode: show parse errors"
+    json: "Output in JSON format"
+    detailed: "Show detailed information"
+    query: "Search query"
+    limit: "Limit number of results"

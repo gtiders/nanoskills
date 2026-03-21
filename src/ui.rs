@@ -16,6 +16,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState, Wrap},
 };
+use rust_i18n::t;
 use std::io;
 use std::sync::OnceLock;
 use syntect::easy::HighlightLines;
@@ -232,7 +233,7 @@ fn build_preview_lines(skill: &Skill) -> Vec<Line<'static>> {
         Ok(yaml_content) => highlight_yaml_content(&yaml_content),
         Err(e) => {
             vec![Line::from(Span::styled(
-                format!("❌ YAML 序列化失败: {}", e),
+                format!("❌ YAML serialization failed: {}", e),
                 Style::default().fg(Color::Red),
             ))]
         }
@@ -369,22 +370,22 @@ fn render(f: &mut Frame, app: &mut App) {
         .split(main_chunks[0]);
 
     let header = Row::new(vec![
-        Cell::from("#").style(
+        Cell::from(t!("ui.table_header.index").to_string()).style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Cell::from("📝 名称").style(
+        Cell::from(t!("ui.table_header.name").to_string()).style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Cell::from("🏷️ 标签").style(
+        Cell::from(t!("ui.table_header.tags").to_string()).style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Cell::from("📖 描述").style(
+        Cell::from(t!("ui.table_header.description").to_string()).style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -443,7 +444,7 @@ fn render(f: &mut Frame, app: &mut App) {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .title(Span::styled(
-                " 📦 技能列表 ",
+                format!(" {} ", t!("ui.list_title")),
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -464,7 +465,7 @@ fn render(f: &mut Frame, app: &mut App) {
         build_preview_lines(skill)
     } else {
         vec![Line::from(Span::styled(
-            "未选择技能",
+            t!("ui.no_selection").to_string(),
             Style::default().fg(Color::DarkGray),
         ))]
     };
@@ -475,7 +476,7 @@ fn render(f: &mut Frame, app: &mut App) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .title(Span::styled(
-                    " 📄 技能预览 ",
+                    format!(" {} ", t!("ui.preview_title")),
                     Style::default()
                         .fg(Color::Magenta)
                         .add_modifier(Modifier::BOLD),
@@ -489,7 +490,7 @@ fn render(f: &mut Frame, app: &mut App) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title(Span::styled(
-            " 🔍 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
+            format!(" {} ", t!("ui.search_prompt")),
             Style::default().fg(Color::Green),
         ));
     let search_text = format!("❯ {}█", app.search_input);

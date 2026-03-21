@@ -1,5 +1,6 @@
 use crate::models::Config;
 use anyhow::{Result, bail};
+use rust_i18n::t;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -90,10 +91,7 @@ pub fn init_config(path: &Path, force: bool) -> Result<Config> {
     let config_path = path.join(CONFIG_FILE_NAME);
 
     if config_path.exists() && !force {
-        bail!(
-            "配置文件已存在: {}\n使用 --force 选项强制覆盖",
-            config_path.display()
-        );
+        bail!("{}", t!("cli.config_exists", path = config_path.display()));
     }
 
     let config = Config::default();

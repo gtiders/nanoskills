@@ -146,6 +146,8 @@ pub struct Config {
     pub max_file_size: u64,
     #[serde(default = "default_search_limit")]
     pub search_limit: usize,
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 fn default_max_file_size() -> u64 {
@@ -163,6 +165,7 @@ impl Default for Config {
             ignore_patterns: vec![],
             max_file_size: DEFAULT_MAX_FILE_SIZE,
             search_limit: DEFAULT_SEARCH_LIMIT,
+            language: None,
         }
     }
 }
@@ -191,6 +194,10 @@ impl Config {
 
         if other.search_limit != DEFAULT_SEARCH_LIMIT {
             merged.search_limit = other.search_limit;
+        }
+
+        if other.language.is_some() {
+            merged.language = other.language.clone();
         }
 
         merged

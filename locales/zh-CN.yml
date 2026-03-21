@@ -1,0 +1,44 @@
+ui:
+  list_title: "📦 技能列表"
+  preview_title: "📄 技能预览"
+  search_prompt: "🔍 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认)"
+  table_header:
+    index: "#"
+    name: "📝 名称"
+    description: "📖 描述"
+    tags: "🏷️ 标签"
+    path: "📁 路径"
+    parameters: "📋 参数定义"
+  no_selection: "未选择任何技能"
+  
+cli:
+  config_created: "✓ 配置文件已创建: %{path}/.agent-skills.yaml"
+  scan_paths: "扫描路径: %{paths}"
+  max_file_size: "最大文件大小: %{size}"
+  search_limit: "搜索结果限制: %{limit}"
+  config_exists: "❌ 配置文件已存在: %{path}\n使用 --force 选项强制覆盖"
+  index_not_found: "索引不存在，请先运行 'nanoskills sync'"
+  sync_complete: "✅ 同步完成！耗时 %{time}ms，扫描了 %{files} 个文件，成功索引 %{skills} 个技能。"
+  parse_errors: "\n⚠️  以下文件解析失败："
+  parse_error_item: "  • %{path} - %{reason}"
+  no_skills: "暂无技能"
+  total_skills: "\n共 %{count} 个技能"
+  search_found: "🔍 找到 %{count} 个技能 (显示前 %{limit} 个):\n"
+  search_not_found: "🔍 未找到匹配的技能"
+  search_hint: "\n💡 提示: 使用 'nanoskills pick' 交互式选择技能"
+  
+  commands:
+    init: "初始化配置文件"
+    sync: "同步/构建索引"
+    list: "列出所有技能"
+    pick: "交互式选择技能 (TUI)"
+    search: "搜索技能 (模糊匹配)"
+    
+  args:
+    path: "目标路径"
+    force: "强制覆盖已存在的配置文件"
+    strict: "严格模式：显示解析失败的文件"
+    json: "输出 JSON 格式"
+    detailed: "显示详细信息"
+    query: "搜索关键词"
+    limit: "限制输出数量"
