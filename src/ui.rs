@@ -271,7 +271,7 @@ fn calculate_clicked_index(
     }
 }
 
-pub fn run_tui(items: Vec<Skill>) -> Result<Option<String>> {
+pub fn run_tui(items: Vec<Skill>) -> Result<Option<Skill>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -297,7 +297,7 @@ pub fn run_tui(items: Vec<Skill>) -> Result<Option<String>> {
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut App,
-) -> Result<Option<String>> {
+) -> Result<Option<Skill>> {
     loop {
         terminal.draw(|f| render(f, app))?;
 
@@ -315,7 +315,7 @@ fn run_app(
                     let result = app
                         .state
                         .selected()
-                        .map(|i| app.filtered_items[i].0.path.clone());
+                        .map(|i| app.filtered_items[i].0.clone());
                     return Ok(result);
                 }
                 KeyCode::Esc => {

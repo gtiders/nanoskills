@@ -1,4 +1,4 @@
-use crate::cmd_sync::{load_index, print_sync_result, run_sync, SkillSearcher};
+use crate::cmd_sync::{SkillSearcher, load_index, print_sync_result, run_sync};
 use crate::config::{init_config, resolve_config};
 use crate::models::{OpenAITool, Skill};
 use crate::ui::run_tui;
@@ -138,8 +138,9 @@ pub fn run() -> Result<()> {
             };
 
             match run_tui(index.skills)? {
-                Some(selected_path) => {
-                    println!("{}", selected_path);
+                Some(skill) => {
+                    print_skill_yaml_highlighted(&skill);
+                    println!("\n📁 路径: {}", skill.path);
                 }
                 None => {
                     eprintln!("未选择任何技能");
@@ -147,11 +148,7 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Search {
-            query,
-            json,
-            limit,
-        } => {
+        Commands::Search { query, json, limit } => {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
@@ -179,7 +176,11 @@ pub fn run() -> Result<()> {
                     return Ok(());
                 }
 
-                println!("找到 {} 个技能 (显示前 {} 个):\n", limited_results.len(), search_limit);
+                println!(
+                    "找到 {} 个技能 (显示前 {} 个):\n",
+                    limited_results.len(),
+                    search_limit
+                );
                 for (skill, score) in &limited_results {
                     println!("  {} - {} [得分: {}]", skill.name, skill.description, score);
                     if !skill.tags.is_empty() {
@@ -283,7 +284,7 @@ fn print_detailed_table(skills: &[Skill]) {
 
 fn print_skill_yaml_highlighted(skill: &Skill) {
     let yaml_str = serde_yaml::to_string(skill).unwrap_or_default();
-    
+
     use std::sync::OnceLock;
     use syntect::easy::HighlightLines;
     use syntect::highlighting::ThemeSet;
@@ -308,7 +309,8 @@ fn print_skill_yaml_highlighted(skill: &Skill) {
             h.highlight_line(line, syntax_set).unwrap_or_default();
 
         for (style, text) in ranges {
-            let color = termion::color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+            let color =
+                termion::color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
             print!("{}{}", termion::color::Fg(color), text);
         }
     }
