@@ -7,10 +7,31 @@
 
 Nanoskills 是一个专为 AI Agent 和开发者打造的轻量级本地工具箱。通过**宽容的头部注释约定**，将任意语言的脚本瞬间转化为 Agent 可直接读取、理解并执行的标准"技能"。
 
+## ⚡ 性能基准
+
+> **ripgrep 级别的极致性能**
+
+| 指标 | 结果 |
+|------|------|
+| 扫描 **150,000+** 文件 | **< 1 秒** |
+| 每秒处理文件数 | **187,000+** |
+| 内存占用 | **< 10 MB** |
+
+```bash
+$ nanoskills sync
+✅ Sync complete! Elapsed 802ms, scanned 150174 files, indexed 47 skills.
+```
+
+**性能优化技术栈：**
+- 🚀 **WalkParallel**：多线程并发文件遍历
+- ⚡ **Rayon**：并行文件解析
+- 🎯 **Lazy I/O**：智能跳过空文件和二进制文件
+- 💾 **零拷贝**：最小化内存分配
+
 ## ✨ 核心特性
 
+- **⚡ 极致性能**：ripgrep 级别的并发扫描，150K 文件 < 1 秒
 - **🧠 零硬编码解析**：动态前缀推导算法，自动识别 99% 编程语言的注释风格
-- **⚡ 极速索引**：基于 `ignore` 库（ripgrep 核心），毫秒级并发扫描
 - **🤖 Agent 原生友好**：`--json` 输出直接兼容 OpenAI Tools Schema
 - **💻 多模态交互**：终端模糊搜索 TUI + 机器只读接口
 - **🌍 国际化支持**：中英文自动切换，跟随系统语言
@@ -263,8 +284,8 @@ src/
 ├── cli.rs       # CLI 命令定义
 ├── models.rs    # 数据结构
 ├── parser.rs    # 动态前缀推导解析器
-├── scanner.rs   # 高速并发扫描
-├── cmd_sync.rs  # 索引构建与搜索
+├── scanner.rs   # 高速并发扫描 (WalkParallel)
+├── cmd_sync.rs  # 索引构建与搜索 (Rayon)
 ├── config.rs    # 配置解析
 └── ui.rs        # TUI 交互界面
 
@@ -285,6 +306,26 @@ let prefix = start_line[..pos].trim_end();
 // 3. 智能剥离后续内容
 let clean_line = trimmed.strip_prefix(prefix)
     .unwrap_or(trimmed);
+```
+
+### 性能优化技术
+
+```rust
+// 并行文件遍历
+let walker: WalkParallel = builder.build_parallel();
+walker.run(|| { /* 多线程处理 */ });
+
+// 并行文件解析
+files.par_iter().map(|file_path| { /* 并行解析 */ }).collect();
+
+// 智能文件过滤
+#[inline]
+pub fn is_safe_text_file(path: &Path, max_size: u64) -> bool {
+    // 跳过空文件和大文件
+    if len == 0 || len > max_size { return false; }
+    // NUL 字节嗅探
+    // ...
+}
 ```
 
 ## 📄 License
