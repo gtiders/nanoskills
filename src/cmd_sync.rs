@@ -88,10 +88,6 @@ impl SkillSearcher {
         SkillSearcher { index }
     }
 
-    pub fn get_by_name(&self, name: &str) -> Option<&Skill> {
-        self.index.skills.iter().find(|s| s.name == name)
-    }
-
     pub fn fuzzy_search(&self, query: &str) -> Vec<(&Skill, i64)> {
         use fuzzy_matcher::FuzzyMatcher;
 

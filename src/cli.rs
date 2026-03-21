@@ -65,15 +65,6 @@ enum Commands {
         #[arg(short = 'l', long, help = "限制输出数量")]
         limit: Option<usize>,
     },
-
-    #[command(about = "查看技能详情 (严格名称匹配)")]
-    Info {
-        #[arg(required = true)]
-        name: String,
-
-        #[arg(short = 'j', long, help = "输出 JSON 格式")]
-        json: bool,
-    },
 }
 
 pub fn run() -> Result<()> {
@@ -140,8 +131,7 @@ pub fn run() -> Result<()> {
 
             match run_tui(index.skills)? {
                 Some(skill) => {
-                    print_skill_yaml_highlighted(&skill);
-                    println!("\n📁 路径: {}", skill.path);
+                    println!("{}", serde_yaml::to_string(&skill)?);
                 }
                 None => {
                     eprintln!("未选择任何技能");
@@ -187,32 +177,7 @@ pub fn run() -> Result<()> {
                     .map(|(skill, _)| (*skill).clone())
                     .collect();
                 print_skills_table(&skills);
-                println!("\n💡 提示: 使用 'nanoskills info <名称>' 查看详细信息");
-            }
-        }
-
-        Commands::Info { name, json } => {
-            let index = match load_index()? {
-                Some(idx) => idx,
-                None => {
-                    eprintln!("索引不存在，请先运行 'nanoskills sync'");
-                    return Ok(());
-                }
-            };
-
-            let searcher = SkillSearcher::new(index);
-
-            match searcher.get_by_name(&name) {
-                Some(skill) => {
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&skill)?);
-                    } else {
-                        print_skill_yaml_highlighted(skill);
-                    }
-                }
-                None => {
-                    eprintln!("未找到技能: {}", name);
-                }
+                println!("\n💡 提示: 使用 'nanoskills pick' 交互式选择技能");
             }
         }
     }
@@ -279,39 +244,4 @@ fn print_detailed_table(skills: &[Skill]) {
 
     println!("{table}");
     println!("\n共 {} 个技能", skills.len());
-}
-
-fn print_skill_yaml_highlighted(skill: &Skill) {
-    let yaml_str = serde_yaml::to_string(skill).unwrap_or_default();
-
-    use std::sync::OnceLock;
-    use syntect::easy::HighlightLines;
-    use syntect::highlighting::ThemeSet;
-    use syntect::parsing::SyntaxSet;
-    use syntect::util::LinesWithEndings;
-
-    static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
-    static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
-
-    let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
-    let theme_set = THEME_SET.get_or_init(ThemeSet::load_defaults);
-
-    let syntax = syntax_set
-        .find_syntax_by_extension("yaml")
-        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
-
-    let theme = &theme_set.themes["base16-ocean.dark"];
-    let mut h = HighlightLines::new(syntax, theme);
-
-    for line in LinesWithEndings::from(&yaml_str) {
-        let ranges: Vec<(syntect::highlighting::Style, &str)> =
-            h.highlight_line(line, syntax_set).unwrap_or_default();
-
-        for (style, text) in ranges {
-            let color =
-                termion::color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
-            print!("{}{}", termion::color::Fg(color), text);
-        }
-    }
-    print!("{}", termion::color::Fg(termion::color::Reset));
 }
