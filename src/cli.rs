@@ -281,15 +281,28 @@ fn print_search_results(results: &[(&Skill, i64)]) {
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "⭐ 得分"]);
+    table.set_header(vec![
+        "#",
+        "📝 名称",
+        "📖 描述",
+        "🏷️ 标签",
+        "📁 路径",
+        "⭐ 得分",
+    ]);
 
     for (i, (skill, score)) in results.iter().enumerate() {
         let tags = skill.tags.join(", ");
+        let path = if skill.path.len() > 40 {
+            format!("...{}", &skill.path[skill.path.len() - 37..])
+        } else {
+            skill.path.clone()
+        };
         table.add_row(vec![
             Cell::new(i + 1),
             Cell::new(&skill.name),
             Cell::new(&skill.description),
             Cell::new(tags),
+            Cell::new(path),
             Cell::new(score),
         ]);
     }
