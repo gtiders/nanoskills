@@ -13,10 +13,10 @@ use std::path::Path;
 rust_i18n::i18n!("locales");
 
 fn detect_language() -> String {
-    if let Ok(config) = config::resolve_config(Path::new(".")) {
-        if let Some(lang) = config.language {
-            return lang;
-        }
+    if let Ok(config) = config::resolve_config(Path::new("."))
+        && let Some(lang) = config.language
+    {
+        return lang;
     }
 
     if let Some(locale) = sys_locale::get_locale() {
