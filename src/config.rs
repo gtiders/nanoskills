@@ -1,5 +1,5 @@
 use crate::models::Config;
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -71,26 +71,12 @@ impl ConfigResolver {
             .join("nanoskills")
     }
 
-    pub fn get_config_dir() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("nanoskills")
-    }
-
     pub fn ensure_cache_dir() -> Result<PathBuf> {
         let cache_dir = Self::get_cache_dir();
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;
         }
         Ok(cache_dir)
-    }
-
-    pub fn ensure_config_dir() -> Result<PathBuf> {
-        let config_dir = Self::get_config_dir();
-        if !config_dir.exists() {
-            fs::create_dir_all(&config_dir)?;
-        }
-        Ok(config_dir)
     }
 }
 
@@ -107,9 +93,23 @@ pub fn save_config(path: &Path, config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn init_config(path: &Path) -> Result<Config> {
+pub fn config_exists(path: &Path) -> bool {
+    path.join(CONFIG_FILE_NAME).exists()
+}
+
+pub fn init_config(path: &Path, force: bool) -> Result<Config> {
+    let config_path = path.join(CONFIG_FILE_NAME);
+
+    if config_path.exists() && !force {
+        bail!(
+            "配置文件已存在: {}\n使用 --force 选项强制覆盖",
+            config_path.display()
+        );
+    }
+
     let config = Config::default();
-    save_config(path, &config)?;
+    let content = serde_yaml::to_string(&config)?;
+    fs::write(&config_path, content)?;
     Ok(config)
 }
 

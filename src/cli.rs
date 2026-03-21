@@ -1,6 +1,6 @@
 use crate::cmd_sync::{load_index, print_sync_result, run_sync, SkillSearcher};
-use crate::config::init_config;
-use crate::models::Skill;
+use crate::config::{init_config, resolve_config};
+use crate::models::{OpenAITool, Skill};
 use crate::ui::run_tui;
 use anyhow::Result;
 use clap::Parser;
@@ -22,6 +22,9 @@ enum Commands {
     Init {
         #[arg(short, long, default_value = ".")]
         path: String,
+
+        #[arg(short = 'f', long, help = "强制覆盖已存在的配置文件")]
+        force: bool,
     },
 
     #[command(about = "同步/构建索引")]
@@ -51,31 +54,22 @@ enum Commands {
         path: String,
     },
 
-    #[command(about = "搜索技能")]
+    #[command(about = "搜索技能 (模糊匹配)")]
     Search {
         #[arg(required = true)]
         query: String,
 
-        #[arg(short, long, default_value = ".")]
-        path: String,
-
-        #[arg(short = 'j', long, help = "输出 JSON 格式（Agent 模式）")]
+        #[arg(short = 'j', long, help = "输出 OpenAI Tools JSON 格式")]
         json: bool,
 
-        #[arg(short, long, help = "模糊搜索")]
-        fuzzy: bool,
-
-        #[arg(short, long, help = "按标签搜索")]
-        tags: Vec<String>,
+        #[arg(short = 'l', long, help = "限制输出数量")]
+        limit: Option<usize>,
     },
 
-    #[command(about = "查看技能详情")]
+    #[command(about = "查看技能详情 (严格名称匹配)")]
     Info {
         #[arg(required = true)]
         name: String,
-
-        #[arg(short, long, default_value = ".")]
-        path: String,
 
         #[arg(short = 'j', long, help = "输出 JSON 格式")]
         json: bool,
@@ -86,12 +80,19 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init { path } => {
+        Commands::Init { path, force } => {
             let path_buf = PathBuf::from(&path);
-            let config = init_config(&path_buf)?;
-            println!("✓ 配置文件已创建: {}/.agent-skills.yaml", path);
-            println!("扫描路径: {:?}", config.scan_paths);
-            println!("最大文件大小: {} bytes", config.max_file_size);
+            match init_config(&path_buf, force) {
+                Ok(config) => {
+                    println!("✓ 配置文件已创建: {}/.agent-skills.yaml", path);
+                    println!("扫描路径: {:?}", config.scan_paths);
+                    println!("最大文件大小: {}", config.max_file_size);
+                    println!("搜索结果限制: {}", config.search_limit);
+                }
+                Err(e) => {
+                    eprintln!("❌ {}", e);
+                }
+            }
         }
 
         Commands::Sync { path, strict } => {
@@ -148,10 +149,8 @@ pub fn run() -> Result<()> {
 
         Commands::Search {
             query,
-            path: _,
             json,
-            fuzzy,
-            tags,
+            limit,
         } => {
             let index = match load_index()? {
                 Some(idx) => idx,
@@ -161,35 +160,28 @@ pub fn run() -> Result<()> {
                 }
             };
 
-            let searcher = SkillSearcher::new(index);
+            let config = resolve_config(&std::env::current_dir()?)?;
+            let search_limit = limit.unwrap_or(config.search_limit);
 
-            let results: Vec<&Skill> = if !tags.is_empty() {
-                searcher.search_by_tags(&tags)
-            } else if fuzzy {
-                searcher
-                    .fuzzy_search(&query)
-                    .into_iter()
-                    .map(|(s, _)| s)
-                    .collect()
-            } else {
-                searcher.search(&query)
-            };
+            let searcher = SkillSearcher::new(index);
+            let results = searcher.fuzzy_search(&query);
+            let limited_results: Vec<_> = results.into_iter().take(search_limit).collect();
 
             if json {
-                let json_output: Vec<serde_json::Value> = results
+                let tools: Vec<OpenAITool> = limited_results
                     .iter()
-                    .map(|s| serde_json::to_value(s).unwrap_or(serde_json::json!(null)))
+                    .map(|(skill, _)| OpenAITool::from(*skill))
                     .collect();
-                println!("{}", serde_json::to_string_pretty(&json_output)?);
+                println!("{}", serde_json::to_string_pretty(&tools)?);
             } else {
-                if results.is_empty() {
+                if limited_results.is_empty() {
                     println!("未找到匹配的技能");
                     return Ok(());
                 }
 
-                println!("找到 {} 个技能:\n", results.len());
-                for skill in results {
-                    println!("  {} - {}", skill.name, skill.description);
+                println!("找到 {} 个技能 (显示前 {} 个):\n", limited_results.len(), search_limit);
+                for (skill, score) in &limited_results {
+                    println!("  {} - {} [得分: {}]", skill.name, skill.description, score);
                     if !skill.tags.is_empty() {
                         println!("    标签: {}", skill.tags.join(", "));
                     }
@@ -199,7 +191,7 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Info { name, path: _, json } => {
+        Commands::Info { name, json } => {
             let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
@@ -215,7 +207,7 @@ pub fn run() -> Result<()> {
                     if json {
                         println!("{}", serde_json::to_string_pretty(&skill)?);
                     } else {
-                        print_skill_yaml(skill);
+                        print_skill_yaml_highlighted(skill);
                     }
                 }
                 None => {
@@ -289,7 +281,36 @@ fn print_detailed_table(skills: &[Skill]) {
     println!("\n共 {} 个技能", skills.len());
 }
 
-fn print_skill_yaml(skill: &Skill) {
+fn print_skill_yaml_highlighted(skill: &Skill) {
     let yaml_str = serde_yaml::to_string(skill).unwrap_or_default();
-    println!("{}", yaml_str);
+    
+    use std::sync::OnceLock;
+    use syntect::easy::HighlightLines;
+    use syntect::highlighting::ThemeSet;
+    use syntect::parsing::SyntaxSet;
+    use syntect::util::LinesWithEndings;
+
+    static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
+    static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
+
+    let syntax_set = SYNTAX_SET.get_or_init(|| SyntaxSet::load_defaults_newlines());
+    let theme_set = THEME_SET.get_or_init(|| ThemeSet::load_defaults());
+
+    let syntax = syntax_set
+        .find_syntax_by_extension("yaml")
+        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+
+    let theme = &theme_set.themes["base16-ocean.dark"];
+    let mut h = HighlightLines::new(syntax, theme);
+
+    for line in LinesWithEndings::from(&yaml_str) {
+        let ranges: Vec<(syntect::highlighting::Style, &str)> =
+            h.highlight_line(line, syntax_set).unwrap_or_default();
+
+        for (style, text) in ranges {
+            let color = termion::color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+            print!("{}{}", termion::color::Fg(color), text);
+        }
+    }
+    print!("{}", termion::color::Fg(termion::color::Reset));
 }

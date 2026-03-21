@@ -1,32 +1,5 @@
 scan_paths:
-- .
-file_patterns:
-- '*.py'
-- '*.sh'
-- '*.js'
-- '*.ts'
-- '*.rs'
-- '*.go'
-- '*.lua'
-- '*.rb'
-- '*.c'
-- '*.cpp'
-- '*.scm'
-- '*.lisp'
-- '*.sql'
-- '*.f90'
-- '*.jl'
-- '*.pl'
-- '*.md'
-- '*.erl'
-- '*.hs'
-- '*.vim'
-- '*.asm'
-- '*.bat'
-- '*.tex'
-- '*.pas'
-- '*.m'
-- '*.R'
-- '*.ml'
-- '*.ps1'
+  - "."
 ignore_patterns: []
+max_file_size: 1MB
+search_limit: 5

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const DEFAULT_MAX_FILE_SIZE: u64 = 1024 * 1024;
+const DEFAULT_SEARCH_LIMIT: usize = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillHeader {
@@ -83,18 +84,76 @@ fn build_parameters_schema(args: &HashMap<String, ArgDef>) -> serde_json::Value 
     })
 }
 
+fn parse_file_size(s: &str) -> Option<u64> {
+    let s = s.trim().to_uppercase();
+
+    if let Ok(bytes) = s.parse::<u64>() {
+        return Some(bytes);
+    }
+
+    let (num_str, multiplier) = if s.ends_with("GB") {
+        (&s[..s.len() - 2], 1024u64 * 1024 * 1024)
+    } else if s.ends_with("MB") {
+        (&s[..s.len() - 2], 1024u64 * 1024)
+    } else if s.ends_with("KB") {
+        (&s[..s.len() - 2], 1024u64)
+    } else if s.ends_with("G") {
+        (&s[..s.len() - 1], 1024u64 * 1024 * 1024)
+    } else if s.ends_with("M") {
+        (&s[..s.len() - 1], 1024u64 * 1024)
+    } else if s.ends_with("K") {
+        (&s[..s.len() - 1], 1024u64)
+    } else {
+        return s.parse::<u64>().ok();
+    };
+
+    num_str.trim().parse::<u64>().ok().map(|n| n * multiplier)
+}
+
+fn serialize_file_size<S>(size: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mb = *size / (1024 * 1024);
+    if *size % (1024 * 1024) == 0 {
+        serializer.serialize_str(&format!("{}MB", mb))
+    } else {
+        serializer.serialize_u64(*size)
+    }
+}
+
+fn deserialize_file_size<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let s = String::deserialize(deserializer)?;
+    parse_file_size(&s).ok_or_else(|| D::Error::custom(format!("Invalid file size format: {}", s)))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub scan_paths: Vec<String>,
     #[serde(default)]
     pub ignore_patterns: Vec<String>,
-    #[serde(default = "default_max_file_size")]
+    #[serde(
+        default = "default_max_file_size",
+        serialize_with = "serialize_file_size",
+        deserialize_with = "deserialize_file_size"
+    )]
     pub max_file_size: u64,
+    #[serde(default = "default_search_limit")]
+    pub search_limit: usize,
 }
 
 fn default_max_file_size() -> u64 {
     DEFAULT_MAX_FILE_SIZE
+}
+
+fn default_search_limit() -> usize {
+    DEFAULT_SEARCH_LIMIT
 }
 
 impl Default for Config {
@@ -103,6 +162,7 @@ impl Default for Config {
             scan_paths: vec![],
             ignore_patterns: vec![],
             max_file_size: DEFAULT_MAX_FILE_SIZE,
+            search_limit: DEFAULT_SEARCH_LIMIT,
         }
     }
 }
@@ -127,6 +187,10 @@ impl Config {
 
         if other.max_file_size != DEFAULT_MAX_FILE_SIZE {
             merged.max_file_size = other.max_file_size;
+        }
+
+        if other.search_limit != DEFAULT_SEARCH_LIMIT {
+            merged.search_limit = other.search_limit;
         }
 
         merged
@@ -168,5 +232,33 @@ pub struct ParseError {
 impl ParseError {
     pub fn new(path: String, reason: String) -> Self {
         ParseError { path, reason }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpenAITool {
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    pub function: OpenAIFunction,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpenAIFunction {
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<serde_json::Value>,
+}
+
+impl From<&Skill> for OpenAITool {
+    fn from(skill: &Skill) -> Self {
+        OpenAITool {
+            tool_type: "function".to_string(),
+            function: OpenAIFunction {
+                name: skill.name.clone(),
+                description: skill.description.clone(),
+                parameters: skill.parameters.clone(),
+            },
+        }
     }
 }
