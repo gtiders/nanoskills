@@ -38,14 +38,10 @@ pub fn run_sync(local_dir: &Path, strict: bool) -> Result<SyncResult> {
                 let skill = Skill::from((header, file_path.clone()));
                 skills.push(skill);
             }
-            Ok(None) => {
-            }
+            Ok(None) => {}
             Err(e) => {
                 if strict {
-                    let error = ParseError::new(
-                        file_path.clone(),
-                        e.to_string(),
-                    );
+                    let error = ParseError::new(file_path.clone(), e.to_string());
                     errors.push(error);
                 }
             }
@@ -90,40 +86,6 @@ pub struct SkillSearcher {
 impl SkillSearcher {
     pub fn new(index: Index) -> Self {
         SkillSearcher { index }
-    }
-
-    pub fn search(&self, query: &str) -> Vec<&Skill> {
-        let query_lower = query.to_lowercase();
-
-        self.index
-            .skills
-            .iter()
-            .filter(|skill| {
-                let name_match = skill.name.to_lowercase().contains(&query_lower);
-                let desc_match = skill.description.to_lowercase().contains(&query_lower);
-                let tag_match = skill
-                    .tags
-                    .iter()
-                    .any(|t| t.to_lowercase().contains(&query_lower));
-
-                name_match || desc_match || tag_match
-            })
-            .collect()
-    }
-
-    pub fn search_by_tags(&self, tags: &[String]) -> Vec<&Skill> {
-        let tags_lower: Vec<String> = tags.iter().map(|t| t.to_lowercase()).collect();
-
-        self.index
-            .skills
-            .iter()
-            .filter(|skill| {
-                skill.tags.iter().any(|skill_tag| {
-                    let skill_tag_lower = skill_tag.to_lowercase();
-                    tags_lower.iter().any(|t| skill_tag_lower.contains(t))
-                })
-            })
-            .collect()
     }
 
     pub fn get_by_name(&self, name: &str) -> Option<&Skill> {

@@ -27,11 +27,11 @@ static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 
 fn get_syntax_set() -> &'static SyntaxSet {
-    SYNTAX_SET.get_or_init(|| SyntaxSet::load_defaults_newlines())
+    SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines)
 }
 
 fn get_theme_set() -> &'static ThemeSet {
-    THEME_SET.get_or_init(|| ThemeSet::load_defaults())
+    THEME_SET.get_or_init(ThemeSet::load_defaults)
 }
 
 pub struct App {
@@ -337,15 +337,15 @@ fn run_app(
                     app.next();
                 }
                 MouseEventKind::Down(button) => {
-                    if button == MouseButton::Left {
-                        if let Some(index) = calculate_clicked_index(
+                    if button == MouseButton::Left
+                        && let Some(index) = calculate_clicked_index(
                             mouse.row,
                             app.table_area,
                             &app.state,
                             app.filtered_items.len(),
-                        ) {
-                            app.select_index(index);
-                        }
+                        )
+                    {
+                        app.select_index(index);
                     }
                 }
                 _ => {}

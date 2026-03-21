@@ -293,8 +293,8 @@ fn print_skill_yaml_highlighted(skill: &Skill) {
     static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
     static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 
-    let syntax_set = SYNTAX_SET.get_or_init(|| SyntaxSet::load_defaults_newlines());
-    let theme_set = THEME_SET.get_or_init(|| ThemeSet::load_defaults());
+    let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
+    let theme_set = THEME_SET.get_or_init(ThemeSet::load_defaults);
 
     let syntax = syntax_set
         .find_syntax_by_extension("yaml")

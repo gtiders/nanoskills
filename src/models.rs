@@ -115,7 +115,7 @@ where
     S: serde::Serializer,
 {
     let mb = *size / (1024 * 1024);
-    if *size % (1024 * 1024) == 0 {
+    if (*size).is_multiple_of(1024 * 1024) {
         serializer.serialize_str(&format!("{}MB", mb))
     } else {
         serializer.serialize_u64(*size)

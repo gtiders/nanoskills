@@ -66,10 +66,6 @@ impl HeaderParser {
     }
 }
 
-pub fn parse_header(path: &Path) -> Result<Option<SkillHeader>> {
-    HeaderParser::parse_file(path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

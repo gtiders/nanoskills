@@ -86,17 +86,6 @@ fn load_config_file(path: &Path) -> Result<Config> {
     Ok(config)
 }
 
-pub fn save_config(path: &Path, config: &Config) -> Result<()> {
-    let config_path = path.join(CONFIG_FILE_NAME);
-    let content = serde_yaml::to_string(config)?;
-    fs::write(&config_path, content)?;
-    Ok(())
-}
-
-pub fn config_exists(path: &Path) -> bool {
-    path.join(CONFIG_FILE_NAME).exists()
-}
-
 pub fn init_config(path: &Path, force: bool) -> Result<Config> {
     let config_path = path.join(CONFIG_FILE_NAME);
 
