@@ -16,7 +16,25 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState, Wrap},
 };
+use std::fs;
 use std::io;
+use std::path::Path;
+use std::sync::OnceLock;
+use syntect::easy::HighlightLines;
+use syntect::highlighting::ThemeSet;
+use syntect::parsing::SyntaxSet;
+use syntect::util::LinesWithEndings;
+
+static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
+static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
+
+fn get_syntax_set() -> &'static SyntaxSet {
+    SYNTAX_SET.get_or_init(|| SyntaxSet::load_defaults_newlines())
+}
+
+fn get_theme_set() -> &'static ThemeSet {
+    THEME_SET.get_or_init(|| ThemeSet::load_defaults())
+}
 
 pub struct App {
     items: Vec<Skill>,
@@ -181,6 +199,54 @@ fn highlight_text(s: &str, indices: &[usize]) -> Line<'static> {
     Line::from(spans)
 }
 
+fn highlight_file_content(content: &str, file_path: &str) -> Vec<Line<'static>> {
+    let syntax_set = get_syntax_set();
+    let theme_set = get_theme_set();
+
+    let extension = Path::new(file_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("txt");
+
+    let syntax = syntax_set
+        .find_syntax_by_extension(extension)
+        .or_else(|| syntax_set.find_syntax_by_first_line(content))
+        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+
+    let theme = &theme_set.themes["base16-ocean.dark"];
+    let mut h = HighlightLines::new(syntax, theme);
+    let mut lines = Vec::new();
+
+    for line in LinesWithEndings::from(content) {
+        let ranges: Vec<(syntect::highlighting::Style, &str)> =
+            h.highlight_line(line, syntax_set).unwrap_or_default();
+
+        let spans: Vec<Span> = ranges
+            .into_iter()
+            .map(|(style, text)| {
+                let color = Color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+                Span::styled(text.to_string(), Style::default().fg(color))
+            })
+            .collect();
+
+        lines.push(Line::from(spans));
+    }
+
+    lines
+}
+
+fn build_preview_lines(skill: &Skill) -> Vec<Line<'static>> {
+    match fs::read_to_string(&skill.path) {
+        Ok(content) => highlight_file_content(&content, &skill.path),
+        Err(e) => {
+            vec![Line::from(Span::styled(
+                format!("❌ 无法读取文件: {}", e),
+                Style::default().fg(Color::Red),
+            ))]
+        }
+    }
+}
+
 fn calculate_clicked_index(
     mouse_y: u16,
     table_rect: Rect,
@@ -297,113 +363,6 @@ fn run_app(
     }
 }
 
-fn build_detail_lines(skill: &Skill, panel_width: u16) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    let separator_width = (panel_width.saturating_sub(2)) as usize;
-    let separator = "─".repeat(separator_width);
-
-    lines.push(Line::from(Span::styled(
-        "基本信息",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(Span::styled(
-        separator.clone(),
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    lines.push(Line::from(vec![
-        Span::styled(
-            "名称: ",
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(skill.name.clone()),
-    ]));
-
-    lines.push(Line::from(vec![
-        Span::styled(
-            "路径: ",
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(skill.path.clone()),
-    ]));
-
-    lines.push(Line::from(""));
-
-    lines.push(Line::from(Span::styled(
-        "标签",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(Span::styled(
-        separator.clone(),
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    if skill.tags.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "无标签",
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        let tags_text = skill.tags.join(" • ");
-        lines.push(Line::from(tags_text));
-    }
-
-    lines.push(Line::from(""));
-
-    lines.push(Line::from(Span::styled(
-        "执行配置",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(Span::styled(
-        separator.clone(),
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    if let Some(ref template) = skill.command_template {
-        lines.push(Line::from(vec![
-            Span::styled(
-                "模板: ",
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(template.clone()),
-        ]));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "无执行模板",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
-
-    lines.push(Line::from(""));
-
-    lines.push(Line::from(Span::styled(
-        "描述",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(Span::styled(
-        separator,
-        Style::default().fg(Color::DarkGray),
-    )));
-
-    lines.push(Line::from(skill.description.clone()));
-
-    lines
-}
-
 fn render(f: &mut Frame, app: &mut App) {
     let size = f.area();
 
@@ -418,17 +377,22 @@ fn render(f: &mut Frame, app: &mut App) {
         .split(main_chunks[0]);
 
     let header = Row::new(vec![
-        Cell::from("序号").style(
+        Cell::from("#").style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Cell::from("名称").style(
+        Cell::from("📝 名称").style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ),
-        Cell::from("描述").style(
+        Cell::from("🏷️ 标签").style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("📖 描述").style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -446,6 +410,14 @@ fn render(f: &mut Frame, app: &mut App) {
             let name_line = highlight_text(&skill.name, indices);
             let name_cell = Cell::from(name_line);
 
+            let tags_text = if skill.tags.is_empty() {
+                "-".to_string()
+            } else {
+                skill.tags.join(", ")
+            };
+            let tags_line = highlight_text(&tags_text, indices);
+            let tags_cell = Cell::from(tags_line);
+
             let desc_line = highlight_text(&skill.description, indices);
             let desc_cell = Cell::from(desc_line);
 
@@ -459,7 +431,7 @@ fn render(f: &mut Frame, app: &mut App) {
                 Style::default()
             };
 
-            Row::new(vec![index_cell, name_cell, desc_cell]).style(style)
+            Row::new(vec![index_cell, name_cell, tags_cell, desc_cell]).style(style)
         })
         .collect();
 
@@ -467,8 +439,9 @@ fn render(f: &mut Frame, app: &mut App) {
         rows,
         [
             Constraint::Length(5),
-            Constraint::Percentage(40),
-            Constraint::Percentage(55),
+            Constraint::Percentage(20),
+            Constraint::Percentage(25),
+            Constraint::Percentage(50),
         ],
     )
     .header(header)
@@ -477,7 +450,7 @@ fn render(f: &mut Frame, app: &mut App) {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .title(Span::styled(
-                " 技能列表 ",
+                " 📦 技能列表 ",
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -494,8 +467,8 @@ fn render(f: &mut Frame, app: &mut App) {
     f.render_stateful_widget(table, table_chunks[0], &mut app.state);
     app.table_area = table_chunks[0];
 
-    let detail_lines = if let Some(skill) = app.selected_skill() {
-        build_detail_lines(skill, table_chunks[1].width)
+    let preview_lines = if let Some(skill) = app.selected_skill() {
+        build_preview_lines(skill)
     } else {
         vec![Line::from(Span::styled(
             "未选择技能",
@@ -503,30 +476,30 @@ fn render(f: &mut Frame, app: &mut App) {
         ))]
     };
 
-    let detail_paragraph = Paragraph::new(detail_lines)
+    let preview_paragraph = Paragraph::new(preview_lines)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .title(Span::styled(
-                    " 技能详情 ",
+                    " 📄 代码预览 ",
                     Style::default()
                         .fg(Color::Magenta)
                         .add_modifier(Modifier::BOLD),
                 )),
         )
-        .wrap(Wrap { trim: true });
+        .wrap(Wrap { trim: false });
 
-    f.render_widget(detail_paragraph, table_chunks[1]);
+    f.render_widget(preview_paragraph, table_chunks[1]);
 
     let search_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title(Span::styled(
-            " 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
+            " 🔍 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
             Style::default().fg(Color::Green),
         ));
-    let search_text = format!("> {}█", app.search_input);
+    let search_text = format!("🔍 {}█", app.search_input);
     let search_paragraph = Paragraph::new(search_text).block(search_block);
     f.render_widget(search_paragraph, main_chunks[1]);
 }
