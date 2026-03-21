@@ -3,6 +3,7 @@ use crate::models::{Index, ParseError, Skill};
 use crate::parser::HeaderParser;
 use crate::scanner::scan_files;
 use anyhow::Result;
+use rayon::prelude::*;
 use rust_i18n::t;
 use std::fs;
 use std::path::Path;
@@ -28,24 +29,33 @@ pub fn run_sync(local_dir: &Path, strict: bool) -> Result<SyncResult> {
     let files = scan_files(&config)?;
     let total_files = files.len();
 
+    let results: Vec<Result<Option<Skill>, ParseError>> = files
+        .par_iter()
+        .map(|file_path| {
+            let path = Path::new(file_path);
+
+            match HeaderParser::parse_file(path) {
+                Ok(Some(header)) => Ok(Some(Skill::from((header, file_path.clone())))),
+                Ok(None) => Ok(None),
+                Err(e) => {
+                    if strict {
+                        Err(ParseError::new(file_path.clone(), e.to_string()))
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
+        })
+        .collect();
+
     let mut skills: Vec<Skill> = Vec::new();
     let mut errors: Vec<ParseError> = Vec::new();
 
-    for file_path in &files {
-        let path = Path::new(file_path);
-
-        match HeaderParser::parse_file(path) {
-            Ok(Some(header)) => {
-                let skill = Skill::from((header, file_path.clone()));
-                skills.push(skill);
-            }
+    for result in results {
+        match result {
+            Ok(Some(skill)) => skills.push(skill),
             Ok(None) => {}
-            Err(e) => {
-                if strict {
-                    let error = ParseError::new(file_path.clone(), e.to_string());
-                    errors.push(error);
-                }
-            }
+            Err(error) => errors.push(error),
         }
     }
 

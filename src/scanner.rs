@@ -1,10 +1,11 @@
 use crate::models::Config;
 use crate::path_utils::normalize_path;
 use anyhow::Result;
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, WalkParallel, WalkState};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 const NUL_SNIFF_SIZE: usize = 512;
 
@@ -18,7 +19,8 @@ impl FileScanner {
     }
 
     pub fn scan(&self) -> Result<Vec<String>> {
-        let mut files = Vec::new();
+        let files: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let max_size = self.config.max_file_size;
 
         for scan_path in &self.config.scan_paths {
             let path = Path::new(scan_path);
@@ -40,33 +42,52 @@ impl FileScanner {
                 builder.add_ignore(pattern);
             }
 
-            for entry in builder.build() {
-                match entry {
-                    Ok(entry) => {
-                        let entry_path = entry.path();
-                        if entry_path.is_file() && is_safe_text_file(entry_path, self.config.max_file_size) {
-                            let normalized = normalize_path(entry_path);
-                            files.push(normalized);
+            let walker: WalkParallel = builder.build_parallel();
+
+            let files_clone = Arc::clone(&files);
+
+            walker.run(|| {
+                let files = Arc::clone(&files_clone);
+
+                Box::new(move |entry| {
+                    match entry {
+                        Ok(entry) => {
+                            let entry_path = entry.path();
+                            if entry_path.is_file() && is_safe_text_file(entry_path, max_size) {
+                                let normalized = normalize_path(entry_path);
+                                if let Ok(mut files) = files.lock() {
+                                    files.push(normalized);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Scan error: {}", err);
                         }
                     }
-                    Err(err) => {
-                        eprintln!("扫描错误: {}", err);
-                    }
-                }
-            }
+                    WalkState::Continue
+                })
+            });
         }
+
+        let files = Arc::try_unwrap(files)
+            .map_err(|_| anyhow::anyhow!("Failed to unwrap Arc"))?
+            .into_inner()
+            .map_err(|_| anyhow::anyhow!("Failed to get inner Mutex"))?;
 
         Ok(files)
     }
 }
 
+#[inline]
 pub fn is_safe_text_file(path: &Path, max_size: u64) -> bool {
     let metadata = match path.metadata() {
         Ok(m) => m,
         Err(_) => return false,
     };
 
-    if metadata.len() > max_size {
+    let len = metadata.len();
+
+    if len == 0 || len > max_size {
         return false;
     }
 
@@ -75,7 +96,9 @@ pub fn is_safe_text_file(path: &Path, max_size: u64) -> bool {
         Err(_) => return false,
     };
 
-    let mut buffer = [0u8; NUL_SNIFF_SIZE];
+    let sniff_size = std::cmp::min(len as usize, NUL_SNIFF_SIZE);
+    let mut buffer = vec![0u8; sniff_size];
+
     let bytes_read = match file.read(&mut buffer) {
         Ok(n) => n,
         Err(_) => return false,
