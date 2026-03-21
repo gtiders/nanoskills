@@ -1,4 +1,5 @@
-use crate::index::{IndexManager, SkillSearcher, init_config, load_config};
+use crate::cmd_sync::{load_index, print_sync_result, run_sync, SkillSearcher};
+use crate::config::init_config;
 use crate::models::Skill;
 use crate::ui::run_tui;
 use anyhow::Result;
@@ -27,6 +28,9 @@ enum Commands {
     Sync {
         #[arg(short, long, default_value = ".")]
         path: String,
+
+        #[arg(long, help = "严格模式：显示解析失败的文件")]
+        strict: bool,
     },
 
     #[command(about = "列出所有技能")]
@@ -87,28 +91,21 @@ pub fn run() -> Result<()> {
             let config = init_config(&path_buf)?;
             println!("✓ 配置文件已创建: {}/.agent-skills.yaml", path);
             println!("扫描路径: {:?}", config.scan_paths);
-            println!("文件模式: {:?}", config.file_patterns);
+            println!("最大文件大小: {} bytes", config.max_file_size);
         }
 
-        Commands::Sync { path } => {
+        Commands::Sync { path, strict } => {
             let path_buf = PathBuf::from(&path);
-            let config = load_config(&path_buf)?;
-            let manager = IndexManager::new(config, &path_buf);
-            let index = manager.sync()?;
-            println!("✓ 索引已同步: {} 个技能", index.skills.len());
-            println!("最后同步时间: {}", index.last_sync);
+            let result = run_sync(&path_buf, strict)?;
+            print_sync_result(&result);
         }
 
         Commands::List {
-            path,
+            path: _,
             json,
             detailed,
         } => {
-            let path_buf = PathBuf::from(&path);
-            let config = load_config(&path_buf)?;
-            let manager = IndexManager::new(config, &path_buf);
-
-            let index = match manager.load_index()? {
+            let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
                     eprintln!("索引不存在，请先运行 'nanoskills sync'");
@@ -130,12 +127,8 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Pick { path } => {
-            let path_buf = PathBuf::from(&path);
-            let config = load_config(&path_buf)?;
-            let manager = IndexManager::new(config, &path_buf);
-
-            let index = match manager.load_index()? {
+        Commands::Pick { path: _ } => {
+            let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
                     eprintln!("索引不存在，请先运行 'nanoskills sync'");
@@ -155,16 +148,12 @@ pub fn run() -> Result<()> {
 
         Commands::Search {
             query,
-            path,
+            path: _,
             json,
             fuzzy,
             tags,
         } => {
-            let path_buf = PathBuf::from(&path);
-            let config = load_config(&path_buf)?;
-            let manager = IndexManager::new(config, &path_buf);
-
-            let index = match manager.load_index()? {
+            let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
                     eprintln!("索引不存在，请先运行 'nanoskills sync'");
@@ -210,12 +199,8 @@ pub fn run() -> Result<()> {
             }
         }
 
-        Commands::Info { name, path, json } => {
-            let path_buf = PathBuf::from(&path);
-            let config = load_config(&path_buf)?;
-            let manager = IndexManager::new(config, &path_buf);
-
-            let index = match manager.load_index()? {
+        Commands::Info { name, path: _, json } => {
+            let index = match load_index()? {
                 Some(idx) => idx,
                 None => {
                     eprintln!("索引不存在，请先运行 'nanoskills sync'");

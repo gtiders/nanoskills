@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+const DEFAULT_MAX_FILE_SIZE: u64 = 1024 * 1024;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillHeader {
     pub name: String,
@@ -83,42 +85,51 @@ fn build_parameters_schema(args: &HashMap<String, ArgDef>) -> serde_json::Value 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
     pub scan_paths: Vec<String>,
-    #[serde(default = "default_file_patterns")]
-    pub file_patterns: Vec<String>,
     #[serde(default)]
     pub ignore_patterns: Vec<String>,
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size: u64,
 }
 
-fn default_file_patterns() -> Vec<String> {
-    vec![
-        "*.py".to_string(),
-        "*.sh".to_string(),
-        "*.js".to_string(),
-        "*.ts".to_string(),
-        "*.rs".to_string(),
-        "*.go".to_string(),
-        "*.lua".to_string(),
-        "*.rb".to_string(),
-        "*.c".to_string(),
-        "*.cpp".to_string(),
-        "*.scm".to_string(),
-        "*.lisp".to_string(),
-        "*.sql".to_string(),
-        "*.f90".to_string(),
-        "*.jl".to_string(),
-        "*.pl".to_string(),
-        "*.md".to_string(),
-    ]
+fn default_max_file_size() -> u64 {
+    DEFAULT_MAX_FILE_SIZE
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            scan_paths: vec![".".to_string()],
-            file_patterns: default_file_patterns(),
+            scan_paths: vec![],
             ignore_patterns: vec![],
+            max_file_size: DEFAULT_MAX_FILE_SIZE,
         }
+    }
+}
+
+impl Config {
+    pub fn merge(&self, other: &Config) -> Config {
+        let mut merged = self.clone();
+
+        if !other.scan_paths.is_empty() {
+            for path in &other.scan_paths {
+                if !merged.scan_paths.contains(path) {
+                    merged.scan_paths.push(path.clone());
+                }
+            }
+        }
+
+        for pattern in &other.ignore_patterns {
+            if !merged.ignore_patterns.contains(pattern) {
+                merged.ignore_patterns.push(pattern.clone());
+            }
+        }
+
+        if other.max_file_size != DEFAULT_MAX_FILE_SIZE {
+            merged.max_file_size = other.max_file_size;
+        }
+
+        merged
     }
 }
 
@@ -146,4 +157,16 @@ fn chrono_lite_now() -> String {
         .unwrap_or_default();
     let secs = duration.as_secs();
     format!("{}Z", secs)
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub path: String,
+    pub reason: String,
+}
+
+impl ParseError {
+    pub fn new(path: String, reason: String) -> Self {
+        ParseError { path, reason }
+    }
 }

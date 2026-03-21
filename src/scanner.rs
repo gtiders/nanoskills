@@ -2,7 +2,11 @@ use crate::models::Config;
 use crate::path_utils::normalize_path;
 use anyhow::Result;
 use ignore::WalkBuilder;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
+
+const NUL_SNIFF_SIZE: usize = 512;
 
 pub struct FileScanner {
     config: Config,
@@ -40,7 +44,7 @@ impl FileScanner {
                 match entry {
                     Ok(entry) => {
                         let entry_path = entry.path();
-                        if entry_path.is_file() && self.matches_pattern(entry_path) {
+                        if entry_path.is_file() && is_safe_text_file(entry_path, self.config.max_file_size) {
                             let normalized = normalize_path(entry_path);
                             files.push(normalized);
                         }
@@ -54,50 +58,34 @@ impl FileScanner {
 
         Ok(files)
     }
-
-    fn matches_pattern(&self, path: &Path) -> bool {
-        let file_name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(name) => name,
-            None => return false,
-        };
-
-        for pattern in &self.config.file_patterns {
-            if glob_match(pattern, file_name) {
-                return true;
-            }
-        }
-
-        false
-    }
 }
 
-fn glob_match(pattern: &str, text: &str) -> bool {
-    let pattern_chars: Vec<char> = pattern.chars().collect();
-    let text_chars: Vec<char> = text.chars().collect();
+pub fn is_safe_text_file(path: &Path, max_size: u64) -> bool {
+    let metadata = match path.metadata() {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
 
-    fn match_helper(pattern: &[char], text: &[char]) -> bool {
-        match (pattern.first(), text.first()) {
-            (None, None) => true,
-            (None, Some(_)) => false,
-            (Some('*'), _) => {
-                let pattern_rest = &pattern[1..];
-                if pattern_rest.is_empty() {
-                    return true;
-                }
-                for i in 0..=text.len() {
-                    if match_helper(pattern_rest, &text[i..]) {
-                        return true;
-                    }
-                }
-                false
-            }
-            (Some('?'), Some(_)) => match_helper(&pattern[1..], &text[1..]),
-            (Some(p), Some(t)) if *p == *t => match_helper(&pattern[1..], &text[1..]),
-            _ => false,
-        }
+    if metadata.len() > max_size {
+        return false;
     }
 
-    match_helper(&pattern_chars, &text_chars)
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut buffer = [0u8; NUL_SNIFF_SIZE];
+    let bytes_read = match file.read(&mut buffer) {
+        Ok(n) => n,
+        Err(_) => return false,
+    };
+
+    if buffer[..bytes_read].contains(&0x00) {
+        return false;
+    }
+
+    true
 }
 
 pub fn scan_files(config: &Config) -> Result<Vec<String>> {

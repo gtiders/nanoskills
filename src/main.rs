@@ -1,5 +1,6 @@
 mod cli;
-mod index;
+mod cmd_sync;
+mod config;
 mod models;
 mod parser;
 mod path_utils;
