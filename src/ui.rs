@@ -16,9 +16,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState, Wrap},
 };
-use std::fs;
 use std::io;
-use std::path::Path;
 use std::sync::OnceLock;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
@@ -199,25 +197,19 @@ fn highlight_text(s: &str, indices: &[usize]) -> Line<'static> {
     Line::from(spans)
 }
 
-fn highlight_file_content(content: &str, file_path: &str) -> Vec<Line<'static>> {
+fn highlight_yaml_content(yaml_content: &str) -> Vec<Line<'static>> {
     let syntax_set = get_syntax_set();
     let theme_set = get_theme_set();
 
-    let extension = Path::new(file_path)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("txt");
-
     let syntax = syntax_set
-        .find_syntax_by_extension(extension)
-        .or_else(|| syntax_set.find_syntax_by_first_line(content))
+        .find_syntax_by_extension("yaml")
         .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
 
     let theme = &theme_set.themes["base16-ocean.dark"];
     let mut h = HighlightLines::new(syntax, theme);
     let mut lines = Vec::new();
 
-    for line in LinesWithEndings::from(content) {
+    for line in LinesWithEndings::from(yaml_content) {
         let ranges: Vec<(syntect::highlighting::Style, &str)> =
             h.highlight_line(line, syntax_set).unwrap_or_default();
 
@@ -236,11 +228,11 @@ fn highlight_file_content(content: &str, file_path: &str) -> Vec<Line<'static>> 
 }
 
 fn build_preview_lines(skill: &Skill) -> Vec<Line<'static>> {
-    match fs::read_to_string(&skill.path) {
-        Ok(content) => highlight_file_content(&content, &skill.path),
+    match serde_yaml::to_string(skill) {
+        Ok(yaml_content) => highlight_yaml_content(&yaml_content),
         Err(e) => {
             vec![Line::from(Span::styled(
-                format!("❌ 无法读取文件: {}", e),
+                format!("❌ YAML 序列化失败: {}", e),
                 Style::default().fg(Color::Red),
             ))]
         }
@@ -445,6 +437,7 @@ fn render(f: &mut Frame, app: &mut App) {
         ],
     )
     .header(header)
+    .column_spacing(3)
     .block(
         Block::default()
             .borders(Borders::ALL)
@@ -499,7 +492,7 @@ fn render(f: &mut Frame, app: &mut App) {
             " 🔍 模糊搜索 (输入文字 / ↑↓ 选择 / Enter 确认 / Esc 退出) ",
             Style::default().fg(Color::Green),
         ));
-    let search_text = format!("🔍 {}█", app.search_input);
+    let search_text = format!("❯ {}█", app.search_input);
     let search_paragraph = Paragraph::new(search_text).block(search_block);
     f.render_widget(search_paragraph, main_chunks[1]);
 }
