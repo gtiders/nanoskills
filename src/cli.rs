@@ -172,23 +172,16 @@ pub fn run() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&tools)?);
             } else {
                 if limited_results.is_empty() {
-                    println!("未找到匹配的技能");
+                    println!("🔍 未找到匹配的技能");
                     return Ok(());
                 }
 
                 println!(
-                    "找到 {} 个技能 (显示前 {} 个):\n",
+                    "🔍 找到 {} 个技能 (显示前 {} 个):\n",
                     limited_results.len(),
                     search_limit
                 );
-                for (skill, score) in &limited_results {
-                    println!("  {} - {} [得分: {}]", skill.name, skill.description, score);
-                    if !skill.tags.is_empty() {
-                        println!("    标签: {}", skill.tags.join(", "));
-                    }
-                    println!("    路径: {}", skill.path);
-                    println!();
-                }
+                print_search_results(&limited_results);
             }
         }
 
@@ -280,6 +273,32 @@ fn print_detailed_table(skills: &[Skill]) {
 
     println!("{table}");
     println!("\n共 {} 个技能", skills.len());
+}
+
+fn print_search_results(results: &[(&Skill, i64)]) {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic);
+
+    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "⭐ 得分"]);
+
+    for (i, (skill, score)) in results.iter().enumerate() {
+        let tags = skill.tags.join(", ");
+        table.add_row(vec![
+            Cell::new(i + 1),
+            Cell::new(&skill.name),
+            Cell::new(&skill.description),
+            Cell::new(tags),
+            Cell::new(score),
+        ]);
+    }
+
+    println!("{table}");
+
+    if !results.is_empty() {
+        println!("\n💡 提示: 使用 'nanoskills info <名称>' 查看详细信息");
+    }
 }
 
 fn print_skill_yaml_highlighted(skill: &Skill) {
