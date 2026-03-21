@@ -1,7 +1,8 @@
 use path_clean::PathClean;
 use std::path::{Path, PathBuf};
 
-pub fn normalize_path(path: &Path) -> String {
+/// Convert a path into a stable absolute Unix-style string for indexing output.
+pub(crate) fn normalize_path(path: &Path) -> String {
     let absolute = make_absolute(path);
     let simplified = simplify_windows_path(&absolute);
     to_unix_style(&simplified)
@@ -9,16 +10,14 @@ pub fn normalize_path(path: &Path) -> String {
 
 fn make_absolute(path: &Path) -> PathBuf {
     if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        match std::fs::canonicalize(path) {
-            Ok(abs) => abs,
-            Err(_) => match std::env::current_dir() {
-                Ok(cwd) => cwd.join(path).clean(),
-                Err(_) => path.to_path_buf(),
-            },
-        }
+        return path.to_path_buf();
     }
+
+    std::fs::canonicalize(path).unwrap_or_else(|_| {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(path).clean())
+            .unwrap_or_else(|_| path.to_path_buf())
+    })
 }
 
 fn simplify_windows_path(path: &Path) -> PathBuf {
@@ -26,8 +25,7 @@ fn simplify_windows_path(path: &Path) -> PathBuf {
 }
 
 fn to_unix_style(path: &Path) -> String {
-    let path_str = path.to_string_lossy();
-    path_str.replace('\\', "/")
+    path.to_string_lossy().replace('\\', "/")
 }
 
 #[cfg(test)]

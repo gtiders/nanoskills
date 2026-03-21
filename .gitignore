@@ -1,4 +1,5 @@
 /target
+.agent-skills.yaml
 *.swp
 *.swo
 *~

@@ -1,5 +1,0 @@
-scan_paths: ["/home"]
-ignore_patterns: []
-max_file_size: 1MB
-search_limit: 5
-language: "en"

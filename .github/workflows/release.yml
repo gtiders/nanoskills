@@ -1,0 +1,73 @@
+name: Release
+
+# 觸發條件：只有在推送以 'v' 開頭的標籤（例如 v1.0.0, v0.1.0-beta）時才會執行
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 權限配置：必須賦予寫入權限，否則 GITHUB_TOKEN 無法創建 Release 草稿和上傳壓縮檔
+permissions:
+  contents: write
+
+jobs:
+  # 任務 1：創建 GitHub Release 頁面實體
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        uses: taiki-e/create-gh-release-action@v1
+        with:
+          # 會自動抓取觸發工作流的 tag 名稱來創建 Release
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # 任務 2：針對各個平台編譯並上傳二進位檔案
+  upload-assets:
+    needs: create-release
+    # 編譯矩陣：定義我們需要同時在哪幾個作業系統上，編譯出哪些目標架構的檔案
+    strategy:
+      matrix:
+        include:
+          # 1. Linux (GNU): 依賴系統 glibc，適合主流桌面版 Linux (Ubuntu/Debian)
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+
+          # 2. Linux (MUSL) [新增]: 全靜態連結，無 glibc 依賴！適合 Alpine 容器或老舊 Linux 伺服器
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+
+          # 3. macOS (Intel): 支援老款 Mac
+          - target: x86_64-apple-darwin
+            os: macos-latest
+
+          # 4. macOS (Apple Silicon): 原生支援 M1/M2/M3 晶片，展現極致效能
+          - target: aarch64-apple-darwin
+            os: macos-latest
+
+          # 5. Windows: 原生 .exe 執行檔
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+
+    # 根據矩陣動態分配運行此 Job 的伺服器 (Ubuntu, Mac, 或是 Windows)
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 針對 Linux MUSL 目標，需要安裝 musl-tools 才能進行編譯
+      - name: Install musl-tools (Linux only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build and Upload Binary
+        # 這個神級 Action 會自動處理 Rust 工具鏈安裝、編譯(--release)、打包(tar.gz/zip) 並上傳到 Release 頁面
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          # 請確認這裡的 bin 名稱與你 Cargo.toml 裡的 package name 或 [[bin]] name 一致
+          bin: nanoskills
+          target: ${{ matrix.target }}
+          # 可選：如果需要把 README 和 LICENSE 一起打包進壓縮檔，可以取消下方註解
+          # tar: all
+          # zip: all
+          token: ${{ secrets.GITHUB_TOKEN }}

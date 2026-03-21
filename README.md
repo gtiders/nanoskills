@@ -1,333 +1,219 @@
-# 🛠️ Nanoskills
+# nanoskills
 
-> **极速、零配置、跨语言的 Agent 本地技能库 CLI**
+> **Zero-config local skill indexing for AI Agents.**  
+> Build a blazing-fast local skill library, search it in milliseconds, and feed it straight into your Agent runtime.
 
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/Rust-2024-orange.svg)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![中文文档](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-blue.svg)](./README_zh.md)
 
-Nanoskills 是一个专为 AI Agent 和开发者打造的轻量级本地工具箱。通过**宽容的头部注释约定**，将任意语言的脚本瞬间转化为 Agent 可直接读取、理解并执行的标准"技能"。
+![Demo](assets/demo.gif)
 
-## ⚡ 性能基准
+## Why nanoskills?
 
-> **ripgrep 级别的极致性能**
+`nanoskills` is a Rust CLI for turning your local scripts, prompts, and automation snippets into an **Agent-ready skill library**.
 
-| 指标 | 结果 |
-|------|------|
-| 扫描 **150,000+** 文件 | **< 1 秒** |
-| 每秒处理文件数 | **187,000+** |
-| 内存占用 | **< 10 MB** |
+It is built for one job:
+
+- index local skills **fast**
+- search them **interactively**
+- export them as **tool-call JSON** for LLMs
+
+## Features
+
+### ⚡ Nanospeed
+Scan **150,000+ files in ~1.5 seconds**.
+
+- Built on top of `ignore`
+- Multi-threaded filesystem walking
+- Zero-config by default
+- Binary-file guardrails with size gate + NUL sniffing
+- Designed for local-first brute-force indexing
+
+### 🤖 Agent Ready
+Export skills as **OpenAI / Claude-friendly tool metadata**.
+
+- `search --json` returns machine-readable JSON
+- Stable, legal, deduplicated tool identifiers
+- Parameters mapped into JSON Schema-style structures
+- Easy to plug into tool/function calling pipelines
+
+### 🎨 Immersive TUI
+A terminal UI that actually feels good to use.
+
+- Real-time fuzzy search
+- Master-detail browsing
+- Syntax-highlighted previews
+- Keyboard-first flow
+- Built with `ratatui` + `syntect`
+
+## Demo
+
+![Demo](assets/demo.gif)
+
+## Quick Start
+
+### 1. Install
 
 ```bash
-$ nanoskills sync
-✅ Sync complete! Elapsed 802ms, scanned 150174 files, indexed 47 skills.
+cargo install --path .
 ```
 
-**性能优化技术栈：**
-- 🚀 **WalkParallel**：多线程并发文件遍历
-- ⚡ **Rayon**：并行文件解析
-- 🎯 **Lazy I/O**：智能跳过空文件和二进制文件
-- 💾 **零拷贝**：最小化内存分配
-
-## ✨ 核心特性
-
-- **⚡ 极致性能**：ripgrep 级别的并发扫描，150K 文件 < 1 秒
-- **🧠 零硬编码解析**：动态前缀推导算法，自动识别 99% 编程语言的注释风格
-- **🤖 Agent 原生友好**：`--json` 输出直接兼容 OpenAI Tools Schema
-- **💻 多模态交互**：终端模糊搜索 TUI + 机器只读接口
-- **🌍 国际化支持**：中英文自动切换，跟随系统语言
-- **📦 零依赖**：Rust 编译为单文件二进制，下载即用
-
-## 🚀 安装
+### 2. Create a config file
 
 ```bash
-# 从源码编译
-git clone https://github.com/gtiders/nanoskills.git
-cd nanoskills
-cargo build --release
-
-# 二进制文件位于
-./target/release/nanoskills
-```
-
-## 📖 快速开始
-
-```bash
-# 直接运行，进入交互式 TUI（默认命令）
-nanoskills
-
-# 或者显式指定命令
-nanoskills pick
-
-# 初始化配置文件
 nanoskills init
+```
 
-# 扫描并索引技能
+### 3. Build the local index
+
+```bash
 nanoskills sync
-
-# 列出所有技能
-nanoskills list
-
-# 搜索技能（模糊匹配）
-nanoskills search "图片"
-
-# Agent 模式（OpenAI Tools 格式）
-nanoskills search "图片" --json
 ```
 
-## ✍️ 技能头部编写约定
-
-在脚本文件的**前 50 行**内，用注释符包裹 YAML 元数据：
-
-### 基本结构
-
-```yaml
-<注释符> ---
-<注释符> name: skill_name
-<注释符> description: 技能描述
-<注释符> tags: [tag1, tag2]
-<注释符> command_template: "python {filepath} --input {file}"
-<注释符> args:
-<注释符>   file:
-<注释符>     type: string
-<注释符>     description: 输入文件路径
-<注释符>     required: true
-<注释符> ---
-```
-
-### 字段说明
-
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `name` | ✅ | 技能唯一标识符 |
-| `description` | ✅ | 技能描述（Agent 依赖此判断何时调用） |
-| `tags` | ❌ | 分类标签，用于搜索 |
-| `command_template` | ❌ | 执行模板，支持 `{filepath}` 占位符 |
-| `args` | ❌ | 参数定义，兼容 JSON Schema |
-
-## 🌍 多语言示例
-
-### Python / Shell / Ruby (# 注释)
-
-```python
-#!/usr/bin/env python3
-# ---
-# name: image_converter
-# description: 图片格式转换工具
-# tags: [image, convert]
-# command_template: python {filepath} --input {file} --format {format}
-# args:
-#   file:
-#     type: string
-#     description: 输入文件路径
-#     required: true
-#   format:
-#     type: string
-#     description: 目标格式 (png/jpg/webp)
-#     required: true
-# ---
-```
-
-### JavaScript / TypeScript / Go (// 注释)
-
-```javascript
-// ---
-// name: js_formatter
-// description: JavaScript 代码格式化
-// tags: [js, format]
-// command_template: node {filepath} --input {file}
-// args:
-//   file:
-//     type: string
-//     description: 文件路径
-//     required: true
-// ---
-```
-
-### C / Rust / OCaml (块注释)
-
-```c
-/*
----
-name: c_compiler
-description: C 代码编译器
-tags: [c, compile]
----
-*/
-```
-
-### Lua / SQL (-- 注释)
-
-```lua
--- ---
--- name: lua_runner
--- description: Lua 脚本执行器
--- tags: [lua, script]
--- ---
-```
-
-## 📡 输出格式
-
-### 人类模式（默认）
+### 4. Search skills
 
 ```bash
-$ nanoskills search "image"
+nanoskills search image
 ```
 
-```
-🔍 Found 2 skills (showing top 5):
-
-┌───┬──────────────────┬──────────────────┬──────────────────┬─────────────────┐
-│ # ┆ 📝 Name          ┆ 📖 Description   ┆ 🏷️ Tags          ┆ 📁 Path         │
-╞═══╪══════════════════╪══════════════════╪══════════════════╪═════════════════╡
-│ 1 ┆ image_converter  ┆ Image converter  ┆ image, convert   ┆ /path/to/skill  │
-│ 2 ┆ image_resizer    ┆ Image resizer    ┆ image, resize    ┆ /path/to/skill  │
-└───┴──────────────────┴──────────────────┴──────────────────┴─────────────────┘
-```
-
-### Agent 模式 (--json)
+### 5. Export Agent-ready JSON
 
 ```bash
-$ nanoskills search "image" --json
+nanoskills search image --json
 ```
+
+### 6. Browse in the TUI
+
+```bash
+nanoskills pick
+```
+
+## Usage
+
+### Build the index
+
+```bash
+nanoskills sync
+nanoskills sync --strict
+```
+
+Example output:
+
+```text
+⚡ Index built in 1487 ms. Scanned 150243 files, indexed 312 skills.
+```
+
+### Search from the CLI
+
+```bash
+nanoskills search resize
+nanoskills search resize --limit 10
+```
+
+### Export JSON for Agents
+
+```bash
+nanoskills search resize --json
+```
+
+Example output:
 
 ```json
 [
   {
     "type": "function",
     "function": {
-      "name": "image_converter",
-      "description": "图片格式转换工具",
+      "name": "image_resize_1a2b3c4d",
+      "description": "Resize an image to a target width and height.",
       "parameters": {
         "type": "object",
         "properties": {
-          "file": {
+          "input": {
             "type": "string",
-            "description": "输入文件路径"
+            "description": "Input image path"
           },
-          "format": {
-            "type": "string",
-            "description": "目标格式 (png/jpg/webp)"
+          "width": {
+            "type": "integer",
+            "description": "Target width"
           }
         },
-        "required": ["file", "format"]
+        "required": ["input", "width"]
       }
     }
   }
 ]
 ```
 
-**直接兼容 OpenAI Function Calling！**
+### Browse with the TUI
 
-## ⚙️ 配置文件
-
-`.agent-skills.yaml`:
-
-```yaml
-# 扫描路径
-scan_paths:
-  - .
-  - ~/scripts
-
-# 忽略模式
-ignore_patterns:
-  - node_modules/*
-  - venv/*
-
-# 最大文件大小（支持 MB/KB/GB）
-max_file_size: 1MB
-
-# 搜索结果限制
-search_limit: 5
-
-# 语言设置（可选：zh-CN / en）
-# 不设置则自动跟随系统语言
-language: "zh-CN"
+```bash
+nanoskills pick
 ```
 
-## 🏗️ 命令详解
+## AI Integration
 
-| 命令 | 说明 |
-|------|------|
-| `nanoskills` | 交互式 TUI 选择（默认命令） |
-| `nanoskills init` | 初始化配置文件 |
-| `nanoskills init --force` | 强制覆盖已存在的配置 |
-| `nanoskills sync` | 扫描并索引技能 |
-| `nanoskills sync --strict` | 严格模式，显示解析错误 |
-| `nanoskills list` | 列出所有技能 |
-| `nanoskills list --detailed` | 显示详细参数定义 |
-| `nanoskills list --json` | JSON 格式输出 |
-| `nanoskills search <query>` | 模糊搜索技能 |
-| `nanoskills search <query> --json` | OpenAI Tools 格式输出 |
-| `nanoskills search <query> --limit 10` | 限制输出数量 |
-| `nanoskills pick` | 交互式 TUI 选择 |
+Use `nanoskills` as a local tool registry for your LLM stack.
 
-## 🌍 国际化
+### Python
 
-Nanoskills 支持中英文自动切换：
+```python
+import json
+import subprocess
 
-**语言探测优先级：**
-1. 配置文件 `.agent-skills.yaml` 中的 `language` 字段
-2. 操作系统语言（自动检测）
-3. 默认英文
+tools_json = subprocess.check_output(
+    ["nanoskills", "search", "image", "--json"],
+    text=True,
+)
+tools = json.loads(tools_json)
 
-**切换语言：**
-```yaml
-# .agent-skills.yaml
-language: "zh-CN"  # 或 "en"
+# pass `tools` into your OpenAI / Claude tool-calling request
+print(tools)
 ```
 
-## 🔧 技术架构
+### Bash
 
-```
-src/
-├── main.rs      # 入口点、语言探测
-├── cli.rs       # CLI 命令定义
-├── models.rs    # 数据结构
-├── parser.rs    # 动态前缀推导解析器
-├── scanner.rs   # 高速并发扫描 (WalkParallel)
-├── cmd_sync.rs  # 索引构建与搜索 (Rayon)
-├── config.rs    # 配置解析
-└── ui.rs        # TUI 交互界面
-
-locales/
-├── en.yml       # 英文翻译
-└── zh-CN.yml    # 中文翻译
+```bash
+TOOLS="$(nanoskills search image --json)"
+echo "$TOOLS"
+# pass this JSON into your Agent runtime
 ```
 
-### 核心算法：动态前缀推导
+## How It Works
 
-```rust
-// 1. 定位 --- 锚点
-let pos = start_line.find("---")?;
+`nanoskills` scans local paths, extracts structured YAML headers from scripts, builds a cache index, and exposes the result through:
 
-// 2. 动态提取前缀
-let prefix = start_line[..pos].trim_end();
+- human-friendly CLI output
+- an interactive TUI
+- machine-readable JSON for Agents
 
-// 3. 智能剥离后续内容
-let clean_line = trimmed.strip_prefix(prefix)
-    .unwrap_or(trimmed);
-```
+## Use Cases
 
-### 性能优化技术
+- Personal AI automation toolbox
+- Local prompt / script registry
+- Team-internal skill catalogs
+- Tool discovery for coding Agents
+- Local-first alternatives to hosted registries
 
-```rust
-// 并行文件遍历
-let walker: WalkParallel = builder.build_parallel();
-walker.run(|| { /* 多线程处理 */ });
+## Tech Stack
 
-// 并行文件解析
-files.par_iter().map(|file_path| { /* 并行解析 */ }).collect();
+- Rust
+- `ignore`
+- `rayon`
+- `ratatui`
+- `crossterm`
+- `syntect`
+- `serde_json`
+- `serde_yaml`
 
-// 智能文件过滤
-#[inline]
-pub fn is_safe_text_file(path: &Path, max_size: u64) -> bool {
-    // 跳过空文件和大文件
-    if len == 0 || len > max_size { return false; }
-    // NUL 字节嗅探
-    // ...
-}
-```
+## Philosophy
 
-## 📄 License
+- **Local-first**
+- **Fast enough to feel instant**
+- **No ceremony**
+- **Agent-native output**
+- **Terminal UX matters**
 
-[MIT License](LICENSE)
+## License
+
+MIT
