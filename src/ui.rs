@@ -475,7 +475,7 @@ fn render(f: &mut Frame, app: &mut App) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .title(Span::styled(
-                    " 📄 代码预览 ",
+                    " 📄 技能预览 ",
                     Style::default()
                         .fg(Color::Magenta)
                         .add_modifier(Modifier::BOLD),
