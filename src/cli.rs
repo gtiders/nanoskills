@@ -124,7 +124,8 @@ pub fn run() -> Result<()> {
             } else if detailed {
                 print_detailed_table(&index.skills);
             } else {
-                print_simple_table(&index.skills);
+                print_skills_table(&index.skills);
+                println!("\n共 {} 个技能", index.skills.len());
             }
         }
 
@@ -181,7 +182,12 @@ pub fn run() -> Result<()> {
                     limited_results.len(),
                     search_limit
                 );
-                print_search_results(&limited_results);
+                let skills: Vec<Skill> = limited_results
+                    .iter()
+                    .map(|(skill, _)| (*skill).clone())
+                    .collect();
+                print_skills_table(&skills);
+                println!("\n💡 提示: 使用 'nanoskills info <名称>' 查看详细信息");
             }
         }
 
@@ -214,7 +220,7 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn print_simple_table(skills: &[Skill]) {
+fn print_skills_table(skills: &[Skill]) {
     if skills.is_empty() {
         println!("暂无技能");
         return;
@@ -225,7 +231,7 @@ fn print_simple_table(skills: &[Skill]) {
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["序号", "名称", "描述", "标签"]);
+    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "📁 路径"]);
 
     for (i, skill) in skills.iter().enumerate() {
         let tags = skill.tags.join(", ");
@@ -234,11 +240,11 @@ fn print_simple_table(skills: &[Skill]) {
             Cell::new(&skill.name),
             Cell::new(&skill.description),
             Cell::new(tags),
+            Cell::new(&skill.path),
         ]);
     }
 
     println!("{table}");
-    println!("\n共 {} 个技能", skills.len());
 }
 
 fn print_detailed_table(skills: &[Skill]) {
@@ -252,7 +258,7 @@ fn print_detailed_table(skills: &[Skill]) {
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
 
-    table.set_header(vec!["序号", "名称", "描述", "标签", "参数定义"]);
+    table.set_header(vec!["#", "📝 名称", "📖 描述", "🏷️ 标签", "📋 参数定义"]);
 
     for (i, skill) in skills.iter().enumerate() {
         let tags = skill.tags.join(", ");
@@ -273,45 +279,6 @@ fn print_detailed_table(skills: &[Skill]) {
 
     println!("{table}");
     println!("\n共 {} 个技能", skills.len());
-}
-
-fn print_search_results(results: &[(&Skill, i64)]) {
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic);
-
-    table.set_header(vec![
-        "#",
-        "📝 名称",
-        "📖 描述",
-        "🏷️ 标签",
-        "📁 路径",
-        "⭐ 得分",
-    ]);
-
-    for (i, (skill, score)) in results.iter().enumerate() {
-        let tags = skill.tags.join(", ");
-        let path = if skill.path.len() > 40 {
-            format!("...{}", &skill.path[skill.path.len() - 37..])
-        } else {
-            skill.path.clone()
-        };
-        table.add_row(vec![
-            Cell::new(i + 1),
-            Cell::new(&skill.name),
-            Cell::new(&skill.description),
-            Cell::new(tags),
-            Cell::new(path),
-            Cell::new(score),
-        ]);
-    }
-
-    println!("{table}");
-
-    if !results.is_empty() {
-        println!("\n💡 提示: 使用 'nanoskills info <名称>' 查看详细信息");
-    }
 }
 
 fn print_skill_yaml_highlighted(skill: &Skill) {
