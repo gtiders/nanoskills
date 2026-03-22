@@ -1,8 +1,12 @@
 use crate::domain::Skill;
 use anyhow::Result;
+use crossterm::{
+    QueueableCommand,
+    style::{Color, Print, ResetColor, SetForegroundColor},
+};
 use rust_i18n::t;
 use serde::Serialize;
-use std::io::IsTerminal;
+use std::io::{IsTerminal, Write};
 use std::sync::OnceLock;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Theme, ThemeSet};
@@ -84,23 +88,27 @@ where
     };
 
     let mut highlighter = HighlightLines::new(syntax, theme);
+    let mut stdout = std::io::stdout();
     for line in LinesWithEndings::from(&content) {
         match highlighter.highlight_line(line, syntax_set) {
             Ok(ranges) => {
                 for (style, text) in ranges {
                     // CLI 输出需要保留 syntect 的分段着色结果，逐段写入终端可以避免把整行重新拼接后丢失颜色边界。
-                    let color = termion::color::Rgb(
-                        style.foreground.r,
-                        style.foreground.g,
-                        style.foreground.b,
-                    );
-                    print!("{}{}", termion::color::Fg(color), text);
+                    stdout.queue(SetForegroundColor(Color::Rgb {
+                        r: style.foreground.r,
+                        g: style.foreground.g,
+                        b: style.foreground.b,
+                    }))?;
+                    stdout.queue(Print(text))?;
                 }
             }
-            Err(_) => print!("{line}"),
+            Err(_) => {
+                stdout.queue(Print(line))?;
+            }
         }
     }
 
-    print!("{}", termion::color::Fg(termion::color::Reset));
+    stdout.queue(ResetColor)?;
+    stdout.flush()?;
     Ok(())
 }
