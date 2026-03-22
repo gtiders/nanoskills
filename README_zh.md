@@ -75,6 +75,18 @@ cargo install --path .
 nanoskills init
 ```
 
+默认会创建全局配置：
+
+```text
+~/.config/nanoskills/.agent-skills.yaml
+```
+
+如果你想在当前目录创建项目级配置：
+
+```bash
+nanoskills init --local
+```
+
 ### 3. 构建本地索引
 
 ```bash
@@ -160,6 +172,48 @@ nanoskills search resize --json
 ```bash
 nanoskills pick
 ```
+
+## 配置作用域
+
+`nanoskills` 同时支持**全局配置**和**项目本地配置**。
+
+### 全局配置
+
+```bash
+nanoskills init
+```
+
+会创建：
+
+```text
+~/.config/nanoskills/.agent-skills.yaml
+~/.config/nanoskills/skills/
+```
+
+默认的全局配置会扫描 `~/.config/nanoskills/skills` 这个共享技能目录。
+
+### 本地配置
+
+```bash
+nanoskills init --local
+```
+
+会创建：
+
+```text
+./.agent-skills.yaml
+```
+
+默认的本地配置会扫描当前目录（`.`）。
+
+### 读取顺序
+
+`nanoskills` 在项目目录中运行时，会按这个顺序读取配置：
+
+1. 先读取全局配置，作为基础层
+2. 再读取当前目录的本地配置，作为覆盖层
+
+也就是说，你可以把通用技能放在全局目录里，同时按项目覆盖 `scan_paths`、限制项和 ignore 规则。
 
 ## Agent 接入指南
 

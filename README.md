@@ -65,6 +65,18 @@ cargo install --path .
 nanoskills init
 ```
 
+By default, this creates the global config at:
+
+```text
+~/.config/nanoskills/.agent-skills.yaml
+```
+
+To create a project-local config in the current directory instead:
+
+```bash
+nanoskills init --local
+```
+
 ### 3. Build the local index
 
 ```bash
@@ -150,6 +162,48 @@ Example output:
 ```bash
 nanoskills pick
 ```
+
+## Configuration Scopes
+
+`nanoskills` supports both **global** and **project-local** configuration.
+
+### Global config
+
+```bash
+nanoskills init
+```
+
+This creates:
+
+```text
+~/.config/nanoskills/.agent-skills.yaml
+~/.config/nanoskills/skills/
+```
+
+The default global config scans the shared `skills/` directory under `~/.config/nanoskills`.
+
+### Local config
+
+```bash
+nanoskills init --local
+```
+
+This creates:
+
+```text
+./.agent-skills.yaml
+```
+
+The default local config scans the current directory (`.`).
+
+### Resolution order
+
+When `nanoskills` runs inside a project directory, it reads configuration in this order:
+
+1. global config as the base layer
+2. local config in the current directory as the override layer
+
+That means you can keep shared skills globally while still customizing `scan_paths`, limits, or ignore rules per project.
 
 ## AI Integration
 

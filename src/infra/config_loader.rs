@@ -5,6 +5,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const CONFIG_FILE_NAME: &str = ".agent-skills.yaml";
+const SKILLS_DIR_NAME: &str = "skills";
+
+pub(crate) enum InitScope {
+    Global,
+    Local(PathBuf),
+}
 
 /// Resolves nanoskills configuration from global and local scopes.
 pub(crate) struct ConfigResolver {
@@ -15,9 +21,7 @@ pub(crate) struct ConfigResolver {
 impl ConfigResolver {
     /// Create a resolver rooted at the provided local working directory.
     pub(crate) fn new(local_dir: &Path) -> Self {
-        let global_config_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("nanoskills");
+        let global_config_dir = global_config_dir();
 
         Self {
             global_config_dir,
@@ -77,6 +81,23 @@ impl ConfigResolver {
     }
 }
 
+fn global_config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("nanoskills")
+}
+
+fn default_global_config() -> Config {
+    Config {
+        scan_paths: vec![SKILLS_DIR_NAME.to_string()],
+        ..Config::default()
+    }
+}
+
+fn default_local_config() -> Config {
+    Config::default()
+}
+
 fn load_config_file(path: &Path) -> Result<Config> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config {}", path.display()))?;
@@ -95,17 +116,34 @@ fn absolutize_scan_paths(base_dir: &Path, config: &mut Config) {
     }
 }
 
-/// Initialize a new `.agent-skills.yaml` under the provided directory.
-pub(crate) fn init_config(path: &Path, force: bool) -> Result<Config> {
-    fs::create_dir_all(path)
-        .with_context(|| format!("failed to create directory {}", path.display()))?;
+/// Return the global config directory under `~/.config/nanoskills`.
+pub(crate) fn get_global_config_dir() -> PathBuf {
+    global_config_dir()
+}
 
-    let config_path = path.join(CONFIG_FILE_NAME);
+pub(crate) fn init_config(scope: InitScope, force: bool) -> Result<Config> {
+    let (config_dir, config) = match scope {
+        InitScope::Global => {
+            let config_dir = get_global_config_dir();
+            fs::create_dir_all(&config_dir)
+                .with_context(|| format!("failed to create directory {}", config_dir.display()))?;
+            fs::create_dir_all(config_dir.join(SKILLS_DIR_NAME)).with_context(|| {
+                format!("failed to create skills directory {}", config_dir.display())
+            })?;
+            (config_dir, default_global_config())
+        }
+        InitScope::Local(config_dir) => {
+            fs::create_dir_all(&config_dir)
+                .with_context(|| format!("failed to create directory {}", config_dir.display()))?;
+            (config_dir, default_local_config())
+        }
+    };
+
+    let config_path = config_dir.join(CONFIG_FILE_NAME);
     if config_path.exists() && !force {
         bail!("{}", t!("cli.config_exists", path = config_path.display()));
     }
 
-    let config = Config::default();
     let content = serde_yaml::to_string(&config).context("failed to serialize default config")?;
     fs::write(&config_path, content)
         .with_context(|| format!("failed to write config {}", config_path.display()))?;

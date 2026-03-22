@@ -3,9 +3,17 @@ use anyhow::Result;
 use rust_i18n::t;
 
 /// Handle `nanoskills init`.
-pub(crate) fn run_init(engine: &SkillEngine, force: bool) -> Result<()> {
-    let path = std::env::current_dir()?;
-    let config = engine.init_config(&path, force)?;
+pub(crate) fn run_init(engine: &SkillEngine, force: bool, local: bool) -> Result<()> {
+    let path = if local {
+        std::env::current_dir()?
+    } else {
+        engine.global_config_dir()
+    };
+    let config = if local {
+        engine.init_local_config(&path, force)?
+    } else {
+        engine.init_global_config(force)?
+    };
 
     println!("{}", t!("cli.config_created", path = path.display()));
     println!(

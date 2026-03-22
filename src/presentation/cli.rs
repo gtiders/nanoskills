@@ -18,6 +18,9 @@ enum Commands {
     Init {
         #[arg(short = 'f', long, help = "Overwrite the existing configuration file")]
         force: bool,
+
+        #[arg(long, help = "Create the configuration file in the current directory")]
+        local: bool,
     },
 
     #[command(about = "Build the local skill index")]
@@ -57,7 +60,7 @@ pub(crate) fn run() -> Result<()> {
 
     match Cli::parse().command {
         None => commands::run_default_command(&engine),
-        Some(Commands::Init { force }) => commands::run_init(&engine, force),
+        Some(Commands::Init { force, local }) => commands::run_init(&engine, force, local),
         Some(Commands::Sync { strict }) => commands::run_sync(&engine, strict),
         Some(Commands::List { json, detailed }) => commands::run_list(&engine, json, detailed),
         Some(Commands::Pick) => commands::run_pick(&engine),

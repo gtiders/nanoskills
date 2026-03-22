@@ -37,6 +37,16 @@ impl TestEnv {
         &self.cache_dir
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn global_config_dir(&self) -> PathBuf {
+        self.config_dir.join("nanoskills")
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn global_config_file(&self) -> PathBuf {
+        self.global_config_dir().join(".agent-skills.yaml")
+    }
+
     pub(crate) fn command_envs(&self) -> Vec<(&'static str, &Path)> {
         vec![
             ("XDG_CACHE_HOME", self.cache_dir()),

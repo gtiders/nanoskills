@@ -3,7 +3,7 @@ use crate::app::{config_service::ConfigService, index_service::IndexService};
 use crate::domain::{Config, ParseError, Skill};
 use crate::infra::scan_files;
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 pub(crate) use crate::app::index_service::LoadIndexState;
@@ -40,8 +40,16 @@ impl SkillEngine {
         })
     }
 
-    pub(crate) fn init_config(&self, local_dir: &Path, force: bool) -> Result<Config> {
-        self.config_service.init(local_dir, force)
+    pub(crate) fn init_global_config(&self, force: bool) -> Result<Config> {
+        self.config_service.init_global(force)
+    }
+
+    pub(crate) fn init_local_config(&self, local_dir: &Path, force: bool) -> Result<Config> {
+        self.config_service.init_local(local_dir, force)
+    }
+
+    pub(crate) fn global_config_dir(&self) -> PathBuf {
+        self.config_service.global_config_dir()
     }
 
     pub(crate) fn load_index(&self) -> LoadIndexState {
