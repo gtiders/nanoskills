@@ -29,3 +29,42 @@ cp -R ./skills/* <RUNTIME_SKILLS_DIR>/
 
 - This project currently exports OpenAI-tools-compatible JSON shape.
 - Runtime-specific adapters are maintained by each runtime environment.
+
+## Extend scan_paths (global/local)
+
+Global (`~/.config/nanoskills/.agent-skills.yaml`):
+
+```yaml
+scan_paths:
+  - skills
+  - /path/to/opencode/skills
+  - /path/to/codex/skills
+  - /path/to/claude/skills
+  - /path/to/openclaw/skills
+```
+
+Project local (`./.agent-skills.yaml`):
+
+```yaml
+scan_paths:
+  - .
+  - ./skills
+  - ./automation
+```
+
+Rebuild after any config change:
+
+```bash
+nanoskills sync
+```
+
+## System prompt policy (recommended)
+
+Add this rule into your runtime's system prompt to make tool selection consistent:
+
+```text
+Before using other tools, first run:
+`nanoskills search <intent> --json`
+Choose the best matching tool from returned results.
+If no good match exists, use fallback tools/reasoning.
+```

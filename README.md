@@ -171,6 +171,54 @@ Resolution order in a project:
 1. Global config (`~/.config/nanoskills/.agent-skills.yaml`)
 2. Local config (`./.agent-skills.yaml`, overrides global)
 
+## Extend Search Paths
+
+You can include any skills directory in `scan_paths` (other tools' skills dirs, team shared dirs, personal script dirs).
+
+Global config example (`~/.config/nanoskills/.agent-skills.yaml`):
+
+```yaml
+scan_paths:
+  - skills
+  - /path/to/opencode/skills
+  - /path/to/claude/skills
+  - /path/to/custom/scripts
+ignore_patterns:
+  - target
+  - .git
+max_file_size: 1MB
+search_limit: 10
+```
+
+Project-local override example (`./.agent-skills.yaml`):
+
+```yaml
+scan_paths:
+  - .
+  - ./skills
+  - ./automation
+search_limit: 20
+```
+
+After changing config, rebuild index:
+
+```bash
+nanoskills sync
+```
+
+## System Prompt Strategy
+
+To make agents consistently use this registry, add a system prompt rule in your runtime:
+
+```text
+When tool usage is needed, first call:
+`nanoskills search <user_intent> --json`
+Select the best matching tool from returned JSON.
+If no suitable tool is found, then fall back to normal reasoning/tools.
+```
+
+This pattern works for Claude/Codex/OpenCode/OpenClaw-style runtimes and keeps tool selection behavior stable.
+
 ## Docs
 
 - [Positioning](./docs/positioning.md)

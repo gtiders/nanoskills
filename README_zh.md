@@ -171,6 +171,54 @@ cp -R ./skills/* <OPENCLAW_SKILLS_DIR>/
 1. 全局配置（`~/.config/nanoskills/.agent-skills.yaml`）
 2. 本地配置（`./.agent-skills.yaml`，覆盖全局）
 
+## 扩展搜索目录
+
+你可以在 `scan_paths` 里加入任意 skills 目录（其他工具目录、团队共享目录、个人脚本目录都可以）。
+
+全局配置示例（`~/.config/nanoskills/.agent-skills.yaml`）：
+
+```yaml
+scan_paths:
+  - skills
+  - /path/to/opencode/skills
+  - /path/to/claude/skills
+  - /path/to/custom/scripts
+ignore_patterns:
+  - target
+  - .git
+max_file_size: 1MB
+search_limit: 10
+```
+
+项目本地覆盖示例（`./.agent-skills.yaml`）：
+
+```yaml
+scan_paths:
+  - .
+  - ./skills
+  - ./automation
+search_limit: 20
+```
+
+修改配置后执行：
+
+```bash
+nanoskills sync
+```
+
+## 系统提示词策略
+
+如果希望 Agent 每次优先通过本工具选技能，可在系统提示词加入规则：
+
+```text
+当需要调用工具时，先执行：
+`nanoskills search <用户意图> --json`
+从返回的 JSON 中选择最匹配的工具。
+若无匹配，再回退到默认推理或其他工具。
+```
+
+这个模式适用于 Claude/Codex/OpenCode/OpenClaw 一类运行时，能让工具选择更稳定。
+
 ## 文档
 
 - [定位说明](./docs/positioning.md)
