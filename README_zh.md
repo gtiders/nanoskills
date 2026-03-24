@@ -12,16 +12,17 @@
 
 ## 定位与痛点
 
-`nanoskills` 解决的是 Agent 工具链里最常见的一类问题：技能分散、难检索、难复用。
+`nanoskills` 解决的是 Agent 工具链里最常见的一类问题：能力分散、难检索、难复用。很多时候 skill 不一定是 markdown，本来就能跑的小脚本经过轻微结构化就是 skill。
 
 常见痛点：
 
-- 技能文件散落，定位慢
+- 许多简单任务其实已有脚本可用，但用过就忘、下次又重写
+- 技能文件散落在脚本和文档里，定位慢
 - 工具元数据不统一，难直接给 LLM 调用
 - Codex/Claude/OpenCode/OpenClaw 接入方式各异
 - 团队共享技能包时目录结构不稳定
 
-`nanoskills` 把流程统一成：扫描 -> 建索引 -> 检索 -> 导出 JSON。
+`nanoskills` 把流程统一成：扫描 -> 建索引 -> 检索 -> 导出 JSON，让同一份 skill 同时满足人类检索和机器调用。
 
 ## 安装
 
@@ -175,24 +176,6 @@ cargo fmt
 cargo clippy --all-targets --all-features -D warnings
 cargo test
 ```
-
-## FAQ
-
-<details>
-<summary>README 里带箭头的可展开部分怎么写？</summary>
-
-```markdown
-<details>
-<summary>点击展开</summary>
-
-这里放折叠内容。
-
-</details>
-```
-
-GitHub 会自动渲染成可点击的小箭头。
-
-</details>
 
 ## License
 

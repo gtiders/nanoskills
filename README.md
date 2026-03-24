@@ -12,16 +12,17 @@
 
 ## Positioning & Pain Points
 
-`nanoskills` solves a common agent workflow problem: your usable automation is spread across many files, formats, and folders.
+`nanoskills` solves a common agent workflow problem: useful automation exists as scattered files, and a skill is often just a lightly-structured script you already use.
 
 Typical pain points:
 
-- skills are hard to discover quickly
+- many useful scripts solve tasks already, but people forget them and rewrite from scratch
+- skills are hard to discover quickly across mixed script/markdown files
 - tool metadata is inconsistent and not LLM-ready
 - each runtime (Codex/Claude/OpenCode/OpenClaw) needs slightly different wiring
 - shared skill packs are hard to distribute across teams
 
-`nanoskills` gives one local source of truth: scan -> index -> search -> export JSON.
+`nanoskills` gives one local source of truth: scan -> index -> search -> export JSON, so the same skill can be found and used by both humans and agents.
 
 ## Install
 
@@ -175,24 +176,6 @@ cargo fmt
 cargo clippy --all-targets --all-features -D warnings
 cargo test
 ```
-
-## FAQ
-
-<details>
-<summary>How do I create arrow-expandable sections in README?</summary>
-
-```markdown
-<details>
-<summary>Click to expand</summary>
-
-Hidden content.
-
-</details>
-```
-
-GitHub renders this with a disclosure arrow.
-
-</details>
 
 ## License
 
