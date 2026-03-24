@@ -69,6 +69,15 @@ jobs:
             touch skills/.gitkeep
           fi
 
+      - name: Verify packaging assets
+        shell: bash
+        run: |
+          test -f LICENSE
+          test -f README.md
+          test -f README_zh.md
+          test -f skills/nanoskills_project_builder/nanoskills_project_builder.md
+          test -f skills/nanoskills_usage_guide/nanoskills_usage_guide.md
+
       - name: Build and Upload Binary
         # 這個神級 Action 會自動處理 Rust 工具鏈安裝、編譯(--release)、打包(tar.gz/zip) 並上傳到 Release 頁面
         uses: taiki-e/upload-rust-binary-action@v1
@@ -76,7 +85,9 @@ jobs:
           # 請確認這裡的 bin 名稱與你 Cargo.toml 裡的 package name 或 [[bin]] name 一致
           bin: nanoskills
           target: ${{ matrix.target }}
-          # 將 README / LICENSE 以及額外資產（如 skills/）一併打包
+          # 額外打包資產（README / LICENSE / skills）
+          include: >-
+            LICENSE,README.md,README_zh.md,skills/nanoskills_project_builder/nanoskills_project_builder.md,skills/nanoskills_usage_guide/nanoskills_usage_guide.md
           tar: all
           zip: all
           token: ${{ secrets.GITHUB_TOKEN }}

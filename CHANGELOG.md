@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-03-24
+
+### Fixed
+
+- Release packaging now explicitly includes `README.md`, `README_zh.md`, `LICENSE`, and bundled `skills/*` files.
+- Added packaging-asset verification step in release workflow to prevent missing files in future release archives.
+
 ## [1.0.1] - 2026-03-24
 
 ### Added
