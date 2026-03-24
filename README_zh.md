@@ -12,7 +12,7 @@
 
 ## 定位与痛点
 
-`nanoskills` 解决的是 Agent 工具链里最常见的一类问题：能力分散、难检索、难复用。很多时候 skill 不一定是 markdown，本来就能跑的小脚本经过轻微结构化就是 skill。
+`nanoskills` 受 Claude Skill 概念启发，并把它拓展到本地工程场景：能力分散、难检索、难复用。很多时候 skill 不一定是 markdown，本来就能跑的小脚本经过轻微结构化就是 skill。
 
 常见痛点：
 
@@ -23,6 +23,8 @@
 - 团队共享技能包时目录结构不稳定
 
 `nanoskills` 把流程统一成：扫描 -> 建索引 -> 检索 -> 导出 JSON，让同一份 skill 同时满足人类检索和机器调用。
+
+项目边界也很明确：当前核心是本地索引/检索和工具元数据导出，不是编排框架，也不是远程执行平台。
 
 ## 安装
 
@@ -168,6 +170,13 @@ cp -R ./skills/* <OPENCLAW_SKILLS_DIR>/
 
 1. 全局配置（`~/.config/nanoskills/.agent-skills.yaml`）
 2. 本地配置（`./.agent-skills.yaml`，覆盖全局）
+
+## 文档
+
+- [定位说明](./docs/positioning.md)
+- [脚本技能化指南](./docs/script-skillization.md)
+- [运行时接入指南](./docs/runtime-integration.md)
+- [Skills 打包结构](./docs/skills-packaging.md)
 
 ## 开发
 

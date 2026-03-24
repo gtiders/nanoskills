@@ -12,7 +12,7 @@
 
 ## Positioning & Pain Points
 
-`nanoskills` solves a common agent workflow problem: useful automation exists as scattered files, and a skill is often just a lightly-structured script you already use.
+`nanoskills` is inspired by the Claude Skill concept and expands it for local engineering workflows: useful automation exists as scattered files, and a skill is often just a lightly structured script you already use.
 
 Typical pain points:
 
@@ -23,6 +23,8 @@ Typical pain points:
 - shared skill packs are hard to distribute across teams
 
 `nanoskills` gives one local source of truth: scan -> index -> search -> export JSON, so the same skill can be found and used by both humans and agents.
+
+Notably, this project focuses on indexing/retrieval and tool metadata export. It is not an orchestration framework or remote execution platform.
 
 ## Install
 
@@ -168,6 +170,13 @@ Resolution order in a project:
 
 1. Global config (`~/.config/nanoskills/.agent-skills.yaml`)
 2. Local config (`./.agent-skills.yaml`, overrides global)
+
+## Docs
+
+- [Positioning](./docs/positioning.md)
+- [Script Skillization](./docs/script-skillization.md)
+- [Runtime Integration](./docs/runtime-integration.md)
+- [Skills Packaging Layout](./docs/skills-packaging.md)
 
 ## Development
 
