@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-24
+
+### Added
+
+- Project-level `skills/` pack with one-skill-per-folder layout for easier runtime portability
+- Extended integration docs for `scan_paths` and system-prompt-first tool routing
+- Additional docs pages for positioning, script skillization, runtime integration, and packaging
+
+### Changed
+
+- `init` global seeding now copies skill files recursively from bundled/current `skills/`
+- Unified default config/cache paths to `~/.config/nanoskills` and `~/.cache/nanoskills`
+- README and README_zh restructured around product positioning, pain points, and runtime copy flow
+
 ### Added
 
 - Layered project structure split into `app`, `domain`, `infra`, and `presentation`
