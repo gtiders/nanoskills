@@ -75,6 +75,7 @@ jobs:
           test -f LICENSE
           test -f README.md
           test -f README_zh.md
+          test -d skills
           test -f skills/nanoskills_project_builder/nanoskills_project_builder.md
           test -f skills/nanoskills_usage_guide/nanoskills_usage_guide.md
 
@@ -87,7 +88,7 @@ jobs:
           target: ${{ matrix.target }}
           # 額外打包資產（README / LICENSE / skills）
           include: >-
-            LICENSE,README.md,README_zh.md,skills/nanoskills_project_builder/nanoskills_project_builder.md,skills/nanoskills_usage_guide/nanoskills_usage_guide.md
+            LICENSE,README.md,README_zh.md,skills
           tar: all
           zip: all
           token: ${{ secrets.GITHUB_TOKEN }}
