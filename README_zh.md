@@ -1,20 +1,35 @@
 # nanoskills
 
-> **为 AI Agent 打造的极速本地技能库 CLI。**  
-> 零配置扫盘，秒级建索引，原生输出工具 JSON。
+> **面向 AI Agent 的本地技能注册表 CLI。**  
+> 把分散的脚本/提示词整理成可搜索、可导出的工具能力。
 
 [![Rust](https://img.shields.io/badge/Rust-2024-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/gtiders/nanoskills?label=Release)](https://github.com/gtiders/nanoskills/releases/latest)
 [![English README](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 
+![Demo](assets/demo.gif)
+
+## 定位与痛点
+
+`nanoskills` 解决的是 Agent 工具链里最常见的一类问题：技能分散、难检索、难复用。
+
+常见痛点：
+
+- 技能文件散落，定位慢
+- 工具元数据不统一，难直接给 LLM 调用
+- Codex/Claude/OpenCode/OpenClaw 接入方式各异
+- 团队共享技能包时目录结构不稳定
+
+`nanoskills` 把流程统一成：扫描 -> 建索引 -> 检索 -> 导出 JSON。
+
 ## 安装
 
-推荐多数用户直接下载二进制：
+推荐：
 
 - 最新 Release： https://github.com/gtiders/nanoskills/releases/latest
 
-从源码安装：
+源码安装：
 
 ```bash
 cargo install --path .
@@ -37,50 +52,73 @@ nanoskills pick
 ~/.config/nanoskills/skills/
 ```
 
-## 核心命令
+## 内置 Skills 目录结构
 
-- `nanoskills init` 创建全局配置和共享 skills 目录。
-- `nanoskills init --local` 创建项目本地配置（`./.agent-skills.yaml`）。
-- `nanoskills sync` 扫描路径并重建本地索引缓存。
-- `nanoskills search <query> [--limit N]` 模糊搜索技能。
-- `nanoskills search <query> --json` 导出可用于工具调用的 JSON。
-- `nanoskills pick` 进入交互式 TUI 浏览。
+本仓库采用 **一技能一目录**，便于复制到其他运行时：
 
-## Agent 工具配置示例
+```text
+skills/
+  nanoskills_project_builder/
+    nanoskills_project_builder.md
+  nanoskills_usage_guide/
+    nanoskills_usage_guide.md
+```
 
-先导出 JSON：
+解压 release 后，可直接把这些子目录复制到目标工具的 `skills/` 目录。
+
+## 复制到其他运行时
+
+示例（把目标路径替换为你的工具实际 skills 目录）：
+
+```bash
+cp -R ./skills/* <TOOL_SKILLS_DIR>/
+```
+
+此外，首次执行全局 `nanoskills init` 时，也会把 bundled/当前目录的 `skills/` 自动拷贝到 `~/.config/nanoskills/skills/`。
+
+## 运行时接线示例
+
+先导出 tools JSON：
 
 ```bash
 nanoskills search image --json > .nanoskills.tools.json
 ```
 
 <details>
-<summary>OpenCode 示例</summary>
+<summary>OpenCode</summary>
 
 ```yaml
-# 示例配置，字段名请按 OpenCode 当前版本调整
+# 示例：按 OpenCode 当前 schema 调整
 external_tools:
   source:
     type: command
     command: "nanoskills search image --json"
 ```
 
-</details>
-
-<details>
-<summary>Codex 示例</summary>
-
-```yaml
-# 示例接线方式
-tools:
-  command_source:
-    cmd: ["nanoskills", "search", "image", "--json"]
+```bash
+cp -R ./skills/* <OPENCODE_SKILLS_DIR>/
 ```
 
 </details>
 
 <details>
-<summary>Claude 示例</summary>
+<summary>Codex</summary>
+
+```yaml
+# 示例：按 Codex runtime schema 调整
+tools:
+  command_source:
+    cmd: ["nanoskills", "search", "image", "--json"]
+```
+
+```bash
+cp -R ./skills/* <CODEX_SKILLS_DIR>/
+```
+
+</details>
+
+<details>
+<summary>Claude</summary>
 
 ```python
 import json, subprocess
@@ -89,40 +127,48 @@ tools = json.loads(subprocess.check_output(
     ["nanoskills", "search", "image", "--json"],
     text=True,
 ))
-# 将 tools 传入 Claude 的工具定义
+# 把 tools 传给 Claude 工具定义
+```
+
+```bash
+cp -R ./skills/* <CLAUDE_SKILLS_DIR>/
 ```
 
 </details>
 
 <details>
-<summary>OpenClaw 示例</summary>
+<summary>OpenClaw</summary>
 
 ```yaml
-# 示例配置，请按 OpenClaw runtime 实际 schema 调整
+# 示例：按 OpenClaw 当前 schema 调整
 tool_registry:
   provider: command
   command: "nanoskills search image --json"
 ```
 
+```bash
+cp -R ./skills/* <OPENCLAW_SKILLS_DIR>/
+```
+
 </details>
+
+## 核心命令
+
+- `nanoskills init` 创建全局配置和共享 skills 目录。
+- `nanoskills init --local` 创建项目本地配置（`./.agent-skills.yaml`）。
+- `nanoskills sync` 扫描路径并重建索引缓存。
+- `nanoskills search <query> [--limit N]` 模糊搜索技能。
+- `nanoskills search <query> --json` 导出可用于工具调用的 JSON。
+- `nanoskills pick` 交互式 TUI 浏览。
 
 ## 配置模型
 
-在项目目录中运行时，读取顺序为：
+项目内运行时读取顺序：
 
 1. 全局配置（`~/.config/nanoskills/.agent-skills.yaml`）
 2. 本地配置（`./.agent-skills.yaml`，覆盖全局）
 
-这样可以全局共享技能，同时按项目覆盖扫描路径和限制参数。
-
-## 工作原理
-
-1. 基于 `ignore` 规则并行扫描文件。
-2. 从脚本注释/头部解析 YAML skill 元数据。
-3. 在 `~/.cache/nanoskills/` 生成索引缓存。
-4. 通过 CLI、TUI、JSON 三种输出方式提供能力。
-
-## 开发与贡献
+## 开发
 
 ```bash
 cargo fmt
@@ -135,8 +181,6 @@ cargo test
 <details>
 <summary>README 里带箭头的可展开部分怎么写？</summary>
 
-使用 HTML 的 `details/summary`：
-
 ```markdown
 <details>
 <summary>点击展开</summary>
@@ -146,7 +190,7 @@ cargo test
 </details>
 ```
 
-GitHub 会自动渲染为可点击的小箭头。
+GitHub 会自动渲染成可点击的小箭头。
 
 </details>
 
