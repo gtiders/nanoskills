@@ -13,9 +13,9 @@ pub(crate) struct TestEnv {
 impl TestEnv {
     pub(crate) fn new() -> Self {
         let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-        let cache_dir = temp_dir.path().join("xdg-cache");
-        let config_dir = temp_dir.path().join("xdg-config");
         let home_dir = temp_dir.path().join("home");
+        let cache_dir = home_dir.join(".cache");
+        let config_dir = home_dir.join(".config");
 
         fs::create_dir_all(&cache_dir).expect("failed to create cache dir");
         fs::create_dir_all(&config_dir).expect("failed to create config dir");
@@ -48,11 +48,7 @@ impl TestEnv {
     }
 
     pub(crate) fn command_envs(&self) -> Vec<(&'static str, &Path)> {
-        vec![
-            ("XDG_CACHE_HOME", self.cache_dir()),
-            ("XDG_CONFIG_HOME", &self.config_dir),
-            ("HOME", &self.home_dir),
-        ]
+        vec![("HOME", &self.home_dir)]
     }
 
     pub(crate) fn command(&self, workspace: &Path) -> Command {

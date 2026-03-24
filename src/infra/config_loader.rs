@@ -67,9 +67,7 @@ impl ConfigResolver {
 
     /// Return the cache directory used for the generated index.
     pub(crate) fn get_cache_dir() -> PathBuf {
-        dirs::cache_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("nanoskills")
+        home_dir().join(".cache").join("nanoskills")
     }
 
     /// Ensure the cache directory exists before writing the index.
@@ -82,9 +80,11 @@ impl ConfigResolver {
 }
 
 fn global_config_dir() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("nanoskills")
+    home_dir().join(".config").join("nanoskills")
+}
+
+fn home_dir() -> PathBuf {
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn default_global_config() -> Config {
