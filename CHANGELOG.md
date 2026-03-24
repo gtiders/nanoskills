@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-03-24
+
+### Fixed
+
+- `scan_paths` now expands `~` and `~/...` to the user home directory when loading config.
+- `sync` now warns (without failing) when a configured scan path does not exist.
+- Added i18n messages for missing scan path warnings in `en` and `zh-CN`.
+
 ## [1.0.3] - 2026-03-24
 
 ### Fixed
