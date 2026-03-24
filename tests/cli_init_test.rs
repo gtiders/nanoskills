@@ -112,3 +112,39 @@ fn cli_init_local_creates_config_in_current_directory() {
 
     assert_eq!(config["scan_paths"][0].as_str(), Some("."));
 }
+
+#[test]
+fn cli_init_global_seeds_workspace_skills_into_global_skills_dir() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-init-seed");
+    let workspace_skills = workspace.join("skills");
+    let workspace_nested = workspace_skills.join("nested");
+    fs::create_dir_all(&workspace_nested).expect("failed to create workspace skills dir");
+
+    fs::write(
+        workspace_skills.join("agent.md"),
+        "---\nname: seeded_agent\ndescription: seeded\n---\n# seeded\n",
+    )
+    .expect("failed to write root skill");
+    fs::write(
+        workspace_nested.join("guide.md"),
+        "---\nname: seeded_guide\ndescription: seeded\n---\n# seeded\n",
+    )
+    .expect("failed to write nested skill");
+
+    env.command(&workspace)
+        .arg("init")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created"));
+
+    let global_skills = env.global_config_dir().join("skills");
+    assert!(
+        global_skills.join("agent.md").exists(),
+        "init should seed workspace skills into global skills directory"
+    );
+    assert!(
+        global_skills.join("nested").join("guide.md").exists(),
+        "init should preserve nested skill directory structure"
+    );
+}

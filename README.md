@@ -1,272 +1,154 @@
 # nanoskills
 
 > **Zero-config local skill indexing for AI Agents.**  
-> Build a blazing-fast local skill library, search it in milliseconds, and feed it straight into your Agent runtime.
+> Scan fast, search instantly, export tool-ready JSON.
 
 [![Rust](https://img.shields.io/badge/Rust-2024-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/gtiders/nanoskills?label=Release)](https://github.com/gtiders/nanoskills/releases/latest)
 [![中文文档](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-blue.svg)](./README_zh.md)
 
-![Demo](assets/demo.gif)
+## Install
 
-## Why nanoskills?
+Recommended for most users:
 
-`nanoskills` is a Rust CLI for turning your local scripts, prompts, and automation snippets into an **Agent-ready skill library**.
+- Download latest binary release: https://github.com/gtiders/nanoskills/releases/latest
 
-It is built for one job:
-
-- index local skills **fast**
-- search them **interactively**
-- export them as **tool-call JSON** for LLMs
-
-## Features
-
-### ⚡ Nanospeed
-Scan **150,000+ files in ~1.5 seconds**.
-
-- Built on top of `ignore`
-- Multi-threaded filesystem walking
-- Zero-config by default
-- Binary-file guardrails with size gate + NUL sniffing
-- Designed for local-first brute-force indexing
-
-### 🤖 Agent Ready
-Export skills as **OpenAI / Claude-friendly tool metadata**.
-
-- `search --json` returns machine-readable JSON
-- Stable, legal, deduplicated tool identifiers
-- Parameters mapped into JSON Schema-style structures
-- Easy to plug into tool/function calling pipelines
-
-### 🎨 Immersive TUI
-A terminal UI that actually feels good to use.
-
-- Real-time fuzzy search
-- Master-detail browsing
-- Syntax-highlighted previews
-- Keyboard-first flow
-- Built with `ratatui` + `syntect`
-
-## Demo
-
-![Demo](assets/demo.gif)
-
-## Quick Start
-
-### 1. Install
+Build from source:
 
 ```bash
 cargo install --path .
 ```
 
-### 2. Create a config file
+## Quick Start
 
 ```bash
 nanoskills init
-```
-
-By default, this creates the global config at:
-
-```text
-~/.config/nanoskills/.agent-skills.yaml
-```
-
-To create a project-local config in the current directory instead:
-
-```bash
-nanoskills init --local
-```
-
-### 3. Build the local index
-
-```bash
 nanoskills sync
-```
-
-### 4. Search skills
-
-```bash
 nanoskills search image
-```
-
-### 5. Export Agent-ready JSON
-
-```bash
 nanoskills search image --json
-```
-
-### 6. Browse in the TUI
-
-```bash
 nanoskills pick
 ```
 
-## Usage
-
-### Build the index
-
-```bash
-nanoskills sync
-nanoskills sync --strict
-```
-
-Example output:
-
-```text
-⚡ Index built in 1487 ms. Scanned 150243 files, indexed 312 skills.
-```
-
-### Search from the CLI
-
-```bash
-nanoskills search resize
-nanoskills search resize --limit 10
-```
-
-### Export JSON for Agents
-
-```bash
-nanoskills search resize --json
-```
-
-Example output:
-
-```json
-[
-  {
-    "type": "function",
-    "function": {
-      "name": "image_resize_1a2b3c4d",
-      "description": "Resize an image to a target width and height.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "input": {
-            "type": "string",
-            "description": "Input image path"
-          },
-          "width": {
-            "type": "integer",
-            "description": "Target width"
-          }
-        },
-        "required": ["input", "width"]
-      }
-    }
-  }
-]
-```
-
-### Browse with the TUI
-
-```bash
-nanoskills pick
-```
-
-## Configuration Scopes
-
-`nanoskills` supports both **global** and **project-local** configuration.
-
-### Global config
-
-```bash
-nanoskills init
-```
-
-This creates:
+Global init creates:
 
 ```text
 ~/.config/nanoskills/.agent-skills.yaml
 ~/.config/nanoskills/skills/
 ```
 
-The default global config scans the shared `skills/` directory under `~/.config/nanoskills`.
+## Core Commands
 
-### Local config
+- `nanoskills init` Create global config and shared skills directory.
+- `nanoskills init --local` Create project-local config (`./.agent-skills.yaml`).
+- `nanoskills sync` Scan paths and rebuild local index cache.
+- `nanoskills search <query> [--limit N]` Fuzzy search indexed skills.
+- `nanoskills search <query> --json` Export OpenAI/Claude-style tool metadata.
+- `nanoskills pick` Browse/search in interactive TUI.
+
+## Agent Runtime Config Examples
+
+First, export tools JSON:
 
 ```bash
-nanoskills init --local
+nanoskills search image --json > .nanoskills.tools.json
 ```
 
-This creates:
+<details>
+<summary>OpenCode Example</summary>
 
-```text
-./.agent-skills.yaml
+```yaml
+# Example only: field names may vary by OpenCode version
+external_tools:
+  source:
+    type: command
+    command: "nanoskills search image --json"
 ```
 
-The default local config scans the current directory (`.`).
+</details>
 
-### Resolution order
+<details>
+<summary>Codex Example</summary>
 
-When `nanoskills` runs inside a project directory, it reads configuration in this order:
+```yaml
+# Example wiring pattern
+tools:
+  command_source:
+    cmd: ["nanoskills", "search", "image", "--json"]
+```
 
-1. global config as the base layer
-2. local config in the current directory as the override layer
+</details>
 
-That means you can keep shared skills globally while still customizing `scan_paths`, limits, or ignore rules per project.
-
-## AI Integration
-
-Use `nanoskills` as a local tool registry for your LLM stack.
-
-### Python
+<details>
+<summary>Claude Example</summary>
 
 ```python
-import json
-import subprocess
+import json, subprocess
 
-tools_json = subprocess.check_output(
+tools = json.loads(subprocess.check_output(
     ["nanoskills", "search", "image", "--json"],
     text=True,
-)
-tools = json.loads(tools_json)
-
-# pass `tools` into your OpenAI / Claude tool-calling request
-print(tools)
+))
+# pass `tools` into Claude tool definitions
 ```
 
-### Bash
+</details>
 
-```bash
-TOOLS="$(nanoskills search image --json)"
-echo "$TOOLS"
-# pass this JSON into your Agent runtime
+<details>
+<summary>OpenClaw Example</summary>
+
+```yaml
+# Example only: adapt to your OpenClaw runtime schema
+tool_registry:
+  provider: command
+  command: "nanoskills search image --json"
 ```
+
+</details>
+
+## Configuration Model
+
+Resolution order inside a project:
+
+1. Global config (`~/.config/nanoskills/.agent-skills.yaml`)
+2. Local config (`./.agent-skills.yaml`, overrides global)
+
+This lets you keep shared global skills while customizing per-project scan paths and limits.
 
 ## How It Works
 
-`nanoskills` scans local paths, extracts structured YAML headers from scripts, builds a cache index, and exposes the result through:
+1. Parallel file scan with `ignore` rules.
+2. Parse YAML skill headers from script/comment blocks.
+3. Build cache index under `~/.cache/nanoskills/`.
+4. Output through CLI table, TUI, or JSON.
 
-- human-friendly CLI output
-- an interactive TUI
-- machine-readable JSON for Agents
+## Development
 
-## Use Cases
+```bash
+cargo fmt
+cargo clippy --all-targets --all-features -D warnings
+cargo test
+```
 
-- Personal AI automation toolbox
-- Local prompt / script registry
-- Team-internal skill catalogs
-- Tool discovery for coding Agents
-- Local-first alternatives to hosted registries
+## FAQ
 
-## Tech Stack
+<details>
+<summary>How do I create arrow-expandable sections in README?</summary>
 
-- Rust
-- `ignore`
-- `rayon`
-- `ratatui`
-- `crossterm`
-- `syntect`
-- `serde_json`
-- `serde_yaml`
+Use HTML `details/summary`:
 
-## Philosophy
+```markdown
+<details>
+<summary>Click to expand</summary>
 
-- **Local-first**
-- **Fast enough to feel instant**
-- **No ceremony**
-- **Agent-native output**
-- **Terminal UX matters**
+Your hidden content here.
+
+</details>
+```
+
+GitHub renders a disclosure arrow automatically.
+
+</details>
 
 ## License
 

@@ -127,9 +127,14 @@ pub(crate) fn init_config(scope: InitScope, force: bool) -> Result<Config> {
             let config_dir = get_global_config_dir();
             fs::create_dir_all(&config_dir)
                 .with_context(|| format!("failed to create directory {}", config_dir.display()))?;
-            fs::create_dir_all(config_dir.join(SKILLS_DIR_NAME)).with_context(|| {
+            let global_skills_dir = config_dir.join(SKILLS_DIR_NAME);
+            let skills_dir_preexisted = global_skills_dir.exists();
+            fs::create_dir_all(&global_skills_dir).with_context(|| {
                 format!("failed to create skills directory {}", config_dir.display())
             })?;
+            if !skills_dir_preexisted {
+                seed_global_skills_from_workspace(&global_skills_dir)?;
+            }
             (config_dir, default_global_config())
         }
         InitScope::Local(config_dir) => {
@@ -149,6 +154,68 @@ pub(crate) fn init_config(scope: InitScope, force: bool) -> Result<Config> {
         .with_context(|| format!("failed to write config {}", config_path.display()))?;
 
     Ok(config)
+}
+
+fn seed_global_skills_from_workspace(global_skills_dir: &Path) -> Result<()> {
+    let Some(source_skills_dir) = find_seed_skills_source()? else {
+        return Ok(());
+    };
+
+    copy_dir_contents_if_missing(&source_skills_dir, global_skills_dir)
+}
+
+fn copy_dir_contents_if_missing(source: &Path, destination: &Path) -> Result<()> {
+    for entry in
+        fs::read_dir(source).with_context(|| format!("failed to read {}", source.display()))?
+    {
+        let entry = entry.with_context(|| format!("failed to read {}", source.display()))?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("failed to inspect {}", source_path.display()))?;
+
+        if file_type.is_dir() {
+            fs::create_dir_all(&destination_path)
+                .with_context(|| format!("failed to create {}", destination_path.display()))?;
+            copy_dir_contents_if_missing(&source_path, &destination_path)?;
+            continue;
+        }
+
+        if file_type.is_file() && !destination_path.exists() {
+            fs::copy(&source_path, &destination_path).with_context(|| {
+                format!(
+                    "failed to copy {} to {}",
+                    source_path.display(),
+                    destination_path.display()
+                )
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn find_seed_skills_source() -> Result<Option<PathBuf>> {
+    // 发布后二进制场景：优先从可执行文件同级目录下的 skills 复制。
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let binary_adjacent = exe_dir.join(SKILLS_DIR_NAME);
+            if binary_adjacent.is_dir() {
+                return Ok(Some(binary_adjacent));
+            }
+        }
+    }
+
+    // 源码开发/本地调试场景：回退到当前工作目录下的 ./skills。
+    let workspace_skills_dir = std::env::current_dir()
+        .context("failed to resolve current working directory")?
+        .join(SKILLS_DIR_NAME);
+    if workspace_skills_dir.is_dir() {
+        return Ok(Some(workspace_skills_dir));
+    }
+
+    Ok(None)
 }
 
 /// Resolve nanoskills config relative to a local working directory.
@@ -227,5 +294,33 @@ language: zh-CN
         // 用户看到的错误需要带上具体文件路径，否则坏配置很难定位。
         assert!(error.to_string().contains("failed to parse YAML"));
         assert!(error.to_string().contains(CONFIG_FILE_NAME));
+    }
+
+    #[test]
+    fn test_copy_dir_contents_if_missing_copies_nested_files_without_overwrite() {
+        let temp = tempdir().expect("failed to create temp dir");
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+        fs::create_dir_all(source.join("nested")).expect("failed to create source nested dir");
+        fs::create_dir_all(&destination).expect("failed to create destination dir");
+
+        fs::write(source.join("a.md"), "from-source").expect("failed to write source file");
+        fs::write(source.join("nested").join("b.md"), "from-source-nested")
+            .expect("failed to write source nested file");
+        fs::write(destination.join("a.md"), "existing").expect("failed to write destination file");
+
+        copy_dir_contents_if_missing(&source, &destination).expect("copy should succeed");
+
+        // 已存在文件不能被覆盖。
+        assert_eq!(
+            fs::read_to_string(destination.join("a.md")).expect("failed to read destination file"),
+            "existing"
+        );
+        // 新文件和子目录文件应被复制。
+        assert_eq!(
+            fs::read_to_string(destination.join("nested").join("b.md"))
+                .expect("failed to read copied nested file"),
+            "from-source-nested"
+        );
     }
 }

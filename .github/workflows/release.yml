@@ -60,6 +60,15 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
+      # 確保發布包可包含專案文檔與 skills 目錄（即使目錄暫時為空）
+      - name: Ensure packaging assets
+        shell: bash
+        run: |
+          mkdir -p skills
+          if [ ! -f skills/.gitkeep ]; then
+            touch skills/.gitkeep
+          fi
+
       - name: Build and Upload Binary
         # 這個神級 Action 會自動處理 Rust 工具鏈安裝、編譯(--release)、打包(tar.gz/zip) 並上傳到 Release 頁面
         uses: taiki-e/upload-rust-binary-action@v1
@@ -67,7 +76,7 @@ jobs:
           # 請確認這裡的 bin 名稱與你 Cargo.toml 裡的 package name 或 [[bin]] name 一致
           bin: nanoskills
           target: ${{ matrix.target }}
-          # 可選：如果需要把 README 和 LICENSE 一起打包進壓縮檔，可以取消下方註解
-          # tar: all
-          # zip: all
+          # 將 README / LICENSE 以及額外資產（如 skills/）一併打包
+          tar: all
+          zip: all
           token: ${{ secrets.GITHUB_TOKEN }}
