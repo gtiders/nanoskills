@@ -31,6 +31,7 @@ impl<'a> FileScanner<'a> {
         for scan_path in &self.config.scan_paths {
             let root = Path::new(scan_path);
             if !root.exists() {
+                eprintln!("{}", t!("cli.scan_path_missing", path = scan_path));
                 continue;
             }
 

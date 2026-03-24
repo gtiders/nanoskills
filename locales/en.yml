@@ -22,6 +22,7 @@ cli:
   index_corrupted: "❌ The local index is unreadable. Run 'nanoskills sync' to rebuild it.\nReason: %{reason}"
   selected_path: "📁 Skill Path: %{path}"
   render_failed: "❌ Failed to render %{label} output. Check whether the skill data is valid. Reason: %{reason}"
+  scan_path_missing: "⚠️ Skipped scan path that does not exist: %{path}"
   scan_error: "⚠️ Skipped an unreadable path: %{reason}"
   invalid_ignore_pattern: "⚠️ Ignored invalid ignore pattern '%{pattern}'. Reason: %{reason}"
   invalid_tool_name: "⚠️ Invalid tool_name in %{path}. Falling back to an auto-generated tool ID."

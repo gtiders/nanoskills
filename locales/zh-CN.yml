@@ -22,6 +22,7 @@ cli:
   index_corrupted: "❌ 无法读取本地索引。请运行 'nanoskills sync' 重新构建。\n原因：%{reason}"
   selected_path: "📁 技能路径：%{path}"
   render_failed: "❌ 无法渲染 %{label} 输出。请检查技能数据是否有效。原因：%{reason}"
+  scan_path_missing: "⚠️ 已跳过不存在的扫描路径：%{path}"
   scan_error: "⚠️ 已跳过无法读取的路径：%{reason}"
   invalid_ignore_pattern: "⚠️ 已忽略无效的 ignore pattern：%{pattern}。原因：%{reason}"
   invalid_tool_name: "⚠️ %{path} 中的 tool_name 无效，已回退为自动生成的工具 ID。"

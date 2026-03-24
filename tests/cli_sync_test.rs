@@ -8,7 +8,9 @@ use std::fs;
 fn cli_sync_builds_index_and_skips_invalid_files() {
     let env = TestEnv::new();
     let workspace = env.root().join("workspace");
+    let global_skills_dir = env.global_config_dir().join("skills");
     fs::create_dir_all(&workspace).expect("failed to create workspace");
+    fs::create_dir_all(&global_skills_dir).expect("failed to create global skills dir");
 
     fs::write(
         workspace.join("hello.py"),
@@ -58,6 +60,33 @@ print("hello")
             .expect("skill path should be a string")
             .ends_with("hello.py")
     );
+}
+
+#[test]
+fn cli_sync_warns_when_scan_path_does_not_exist() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-missing-path");
+    let global_skills_dir = env.global_config_dir().join("skills");
+    fs::create_dir_all(&workspace).expect("failed to create workspace");
+    fs::create_dir_all(&global_skills_dir).expect("failed to create global skills dir");
+
+    fs::write(
+        workspace.join(".agent-skills.yaml"),
+        r#"
+scan_paths:
+  - ./missing-skills
+"#,
+    )
+    .expect("failed to write local config");
+
+    env.command(&workspace)
+        .arg("sync")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Skipped scan path that does not exist",
+        ))
+        .stderr(predicate::str::contains("missing-skills"));
 }
 
 #[test]

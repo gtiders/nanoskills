@@ -108,12 +108,29 @@ fn load_config_file(path: &Path) -> Result<Config> {
 }
 
 fn absolutize_scan_paths(base_dir: &Path, config: &mut Config) {
+    let home = home_dir();
     for scan_path in &mut config.scan_paths {
-        let candidate = Path::new(scan_path);
-        if candidate.is_relative() {
-            *scan_path = base_dir.join(candidate).to_string_lossy().into_owned();
-        }
+        *scan_path = resolve_scan_path(base_dir, &home, scan_path);
     }
+}
+
+fn resolve_scan_path(base_dir: &Path, home: &Path, scan_path: &str) -> String {
+    if scan_path == "~" {
+        return home.to_string_lossy().into_owned();
+    }
+    if let Some(rest) = scan_path
+        .strip_prefix("~/")
+        .or_else(|| scan_path.strip_prefix("~\\"))
+    {
+        return home.join(rest).to_string_lossy().into_owned();
+    }
+
+    let candidate = Path::new(scan_path);
+    if candidate.is_relative() {
+        return base_dir.join(candidate).to_string_lossy().into_owned();
+    }
+
+    scan_path.to_string()
 }
 
 /// Return the global config directory under `~/.config/nanoskills`.
@@ -294,6 +311,26 @@ language: zh-CN
         // 用户看到的错误需要带上具体文件路径，否则坏配置很难定位。
         assert!(error.to_string().contains("failed to parse YAML"));
         assert!(error.to_string().contains(CONFIG_FILE_NAME));
+    }
+
+    #[test]
+    fn test_resolve_scan_path_expands_tilde_and_keeps_absolute_path() {
+        let base = Path::new("/workspace/project");
+        let home = Path::new("/home/demo");
+
+        assert_eq!(
+            resolve_scan_path(base, home, "~/skills"),
+            "/home/demo/skills"
+        );
+        assert_eq!(resolve_scan_path(base, home, "~"), "/home/demo");
+        assert_eq!(
+            resolve_scan_path(base, home, "relative/skills"),
+            "/workspace/project/relative/skills"
+        );
+        assert_eq!(
+            resolve_scan_path(base, home, "/opt/shared-skills"),
+            "/opt/shared-skills"
+        );
     }
 
     #[test]
