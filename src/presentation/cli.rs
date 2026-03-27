@@ -29,6 +29,9 @@ enum Commands {
         strict: bool,
     },
 
+    #[command(about = "Print default/local/effective configs")]
+    Config,
+
     #[command(about = "List indexed skills")]
     List {
         #[arg(short = 'j', long, help = "Print machine-readable JSON")]
@@ -62,6 +65,7 @@ pub(crate) fn run() -> Result<()> {
         None => commands::run_default_command(&engine),
         Some(Commands::Init { force, local }) => commands::run_init(&engine, force, local),
         Some(Commands::Sync { strict }) => commands::run_sync(&engine, strict),
+        Some(Commands::Config) => commands::run_config(&engine),
         Some(Commands::List { json, detailed }) => commands::run_list(&engine, json, detailed),
         Some(Commands::Pick) => commands::run_pick(&engine),
         Some(Commands::Search { query, json, limit }) => {

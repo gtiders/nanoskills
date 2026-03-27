@@ -1,5 +1,8 @@
 use crate::domain::Config;
-use crate::infra::{InitScope, get_global_config_dir, init_config, resolve_config};
+use crate::infra::{
+    ConfigSnapshot, InitScope, get_global_config_dir, init_config, resolve_config,
+    resolve_config_snapshot,
+};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 
@@ -24,6 +27,10 @@ impl ConfigService {
 
     pub(crate) fn resolve(&self, local_dir: &Path) -> Result<Config> {
         resolve_config(local_dir)
+    }
+
+    pub(crate) fn resolve_snapshot(&self, local_dir: &Path) -> Result<ConfigSnapshot> {
+        resolve_config_snapshot(local_dir)
     }
 
     pub(crate) fn resolve_search_limit(

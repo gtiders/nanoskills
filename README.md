@@ -1,36 +1,64 @@
 # nanoskills
 
-> **A local-first skill registry CLI for AI agents.**  
-> Turn scattered scripts/prompts into searchable, tool-call-ready skills.
+A local-first, fast skill-retrieval CLI for deep AI agent integration.
 
-[![Rust](https://img.shields.io/badge/Rust-2024-orange.svg)](https://www.rust-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/gtiders/nanoskills?label=Release)](https://github.com/gtiders/nanoskills/releases/latest)
-[![中文文档](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-blue.svg)](./README_zh.md)
+## Comprehensive Overview
 
-![Demo](assets/demo.gif)
+`nanoskills` solves two core problems for agent-oriented skill systems.
 
-## Positioning & Pain Points
+### 1) Fast Skill Retrieval for Agent Workflows
 
-`nanoskills` is inspired by the Claude Skill concept and expands it for local engineering workflows: useful automation exists as scattered files, and a skill is often just a lightly structured script you already use.
+It builds a local searchable index from configured paths and keeps retrieval deterministic:
 
-Typical pain points:
+- scan skill files from global/local merged config
+- parse normalized metadata (`name`, `description`, `tool_name`, `args`, `tags`)
+- build a local cache index for low-latency lookup
+- return stable JSON for tool-call integration
 
-- many useful scripts solve tasks already, but people forget them and rewrite from scratch
-- skills are hard to discover quickly across mixed script/markdown files
-- tool metadata is inconsistent and not LLM-ready
-- each runtime (Codex/Claude/OpenCode/OpenClaw) needs slightly different wiring
-- shared skill packs are hard to distribute across teams
+This makes `skill find` fast and repeatable in real agent loops.
 
-`nanoskills` gives one local source of truth: scan -> index -> search -> export JSON, so the same skill can be found and used by both humans and agents.
+### 2) Skill System Beyond Markdown
 
-Notably, this project focuses on indexing/retrieval and tool metadata export. It is not an orchestration framework or remote execution platform.
+A skill is not limited to `.md`. Any script/file can be a skill as long as it contains a valid YAML header in the file's comment style.
+
+- keep existing script logic unchanged
+- add structured header for indexing and tool export
+- support mixed repositories (Python/Shell/JS/Rust/Lua/Markdown, etc.)
+- keep one-skill-per-folder layout for portability across runtimes
+
+### Markdown-only vs nanoskills
+
+| Dimension | Markdown-only skill system | nanoskills |
+| --- | --- | --- |
+| Skill carrier | Mostly `.md` | Markdown + scripts/files with YAML header |
+| Existing script reuse | Usually requires rewrite | Keep original script logic, add header only |
+| Retrieval path | Often file browsing/manual grep | Indexed local search (`sync` -> `search`) |
+| Agent integration | Ad-hoc text extraction | Stable `search --json` tool output |
+| Config visibility | Implicit | Explicit via `nanoskills config` snapshots |
+| Cross-runtime portability | Varies by format/layout | One-skill-per-folder + normalized metadata |
+
+## What It Does
+
+`nanoskills` provides one deterministic pipeline:
+
+1. scan configured paths
+2. parse skill headers from scripts/markdown
+3. build a local index cache
+4. retrieve by fuzzy search
+5. export machine-readable JSON tool definitions
+
+Key characteristics:
+
+- fast local retrieval for frequent skill find workflows
+- stable JSON output for deep agent/runtime integration
+- deterministic scan -> index -> search flow
+
+It focuses on indexing and retrieval. It is not a remote execution or workflow orchestration system.
 
 ## Install
 
-Recommended:
-
-- Download latest release: https://github.com/gtiders/nanoskills/releases/latest
+From release:
+- https://github.com/gtiders/nanoskills/releases/latest
 
 From source:
 
@@ -42,189 +70,115 @@ cargo install --path .
 
 ```bash
 nanoskills init
-nanoskills sync
-nanoskills search image
+nanoskills config
+nanoskills sync --strict
 nanoskills search image --json
-nanoskills pick
 ```
-
-Global init creates:
-
-```text
-~/.config/nanoskills/.agent-skills.yaml
-~/.config/nanoskills/skills/
-```
-
-## Built-in Skills Layout
-
-This repository uses **one skill per folder** for easy cross-tool copy:
-
-```text
-skills/
-  nanoskills_project_builder/
-    nanoskills_project_builder.md
-  nanoskills_usage_guide/
-    nanoskills_usage_guide.md
-```
-
-When a release archive is unpacked, copy these skill folders into any runtime that supports a `skills/` directory.
-
-## Copy Skills To Other Runtimes
-
-Example (replace target path with your runtime's actual skills directory):
-
-```bash
-cp -R ./skills/* <TOOL_SKILLS_DIR>/
-```
-
-If you run `nanoskills init` globally for the first time, it also seeds global skills from bundled/current `skills/` into `~/.config/nanoskills/skills/`.
-
-## Runtime Wiring Examples
-
-First export tools JSON:
-
-```bash
-nanoskills search image --json > .nanoskills.tools.json
-```
-
-<details>
-<summary>OpenCode</summary>
-
-```yaml
-# Example only: adapt to your OpenCode schema/version
-external_tools:
-  source:
-    type: command
-    command: "nanoskills search image --json"
-```
-
-```bash
-cp -R ./skills/* <OPENCODE_SKILLS_DIR>/
-```
-
-</details>
-
-<details>
-<summary>Codex</summary>
-
-```yaml
-# Example only: adapt to your Codex runtime schema
-tools:
-  command_source:
-    cmd: ["nanoskills", "search", "image", "--json"]
-```
-
-```bash
-cp -R ./skills/* <CODEX_SKILLS_DIR>/
-```
-
-</details>
-
-<details>
-<summary>Claude</summary>
-
-```python
-import json, subprocess
-
-tools = json.loads(subprocess.check_output(
-    ["nanoskills", "search", "image", "--json"],
-    text=True,
-))
-# pass `tools` to your Claude tool definitions
-```
-
-```bash
-cp -R ./skills/* <CLAUDE_SKILLS_DIR>/
-```
-
-</details>
-
-<details>
-<summary>OpenClaw</summary>
-
-```yaml
-# Example only: adapt to your OpenClaw schema/version
-tool_registry:
-  provider: command
-  command: "nanoskills search image --json"
-```
-
-```bash
-cp -R ./skills/* <OPENCLAW_SKILLS_DIR>/
-```
-
-</details>
 
 ## Core Commands
 
-- `nanoskills init` Create global config and shared skills directory.
-- `nanoskills init --local` Create project-local config (`./.agent-skills.yaml`).
-- `nanoskills sync` Scan paths and rebuild index cache.
-- `nanoskills search <query> [--limit N]` Fuzzy search indexed skills.
-- `nanoskills search <query> --json` Export OpenAI/Claude-friendly tool metadata.
-- `nanoskills pick` Interactive TUI browsing.
+- `nanoskills init`:
+  Create global config at `~/.config/nanoskills/.agent-skills.yaml`.
+- `nanoskills init --local`:
+  Create local config at `./.agent-skills.yaml`.
+- `nanoskills config`:
+  Print three snapshots:
+  - default config
+  - current-directory local config
+  - effective merged config
+- `nanoskills sync`:
+  Scan + rebuild local index cache.
+- `nanoskills sync --strict`:
+  Fail on malformed/invalid headers.
+- `nanoskills search <query> [--limit N]`:
+  Fuzzy search indexed skills.
+- `nanoskills search <query> --json`:
+  Export tool-call-ready JSON.
+- `nanoskills list [--json] [--detailed]`:
+  List indexed skills.
+- `nanoskills pick`:
+  Interactive TUI (human only, not for automation).
 
 ## Configuration Model
 
-Resolution order in a project:
+Config files:
 
-1. Global config (`~/.config/nanoskills/.agent-skills.yaml`)
-2. Local config (`./.agent-skills.yaml`, overrides global)
+- global: `~/.config/nanoskills/.agent-skills.yaml`
+- local: `./.agent-skills.yaml`
 
-## Extend Search Paths
+Effective config is computed as:
 
-You can include any skills directory in `scan_paths` (other tools' skills dirs, team shared dirs, personal script dirs).
+1. read global (if exists)
+2. read local (if exists)
+3. merge global + local
+   - list fields (`scan_paths`, `ignore_patterns`): append local unique items
+   - scalar fields (`max_file_size`, `search_limit`, `language`): local overrides global
+4. inject global shared skills path `~/.config/nanoskills/skills` into `scan_paths` front (if missing)
 
-Global config example (`~/.config/nanoskills/.agent-skills.yaml`):
+Use `nanoskills config` to inspect the exact runtime result.
+
+## Minimal Config Example
 
 ```yaml
 scan_paths:
   - skills
-  - /path/to/opencode/skills
-  - /path/to/claude/skills
-  - /path/to/custom/scripts
+  - ./automation
 ignore_patterns:
   - target
   - .git
 max_file_size: 1MB
 search_limit: 10
+language: en
 ```
 
-Project-local override example (`./.agent-skills.yaml`):
+## Skill Header Requirements
 
-```yaml
-scan_paths:
-  - .
-  - ./skills
-  - ./automation
-search_limit: 20
+Minimum header fields:
+
+- `name`
+- `description`
+
+Recommended fields:
+
+- `tool_name` (stable tool id)
+- `tags`
+- `args`
+
+Python example:
+
+```python
+# ---
+# name: disk_check
+# description: Check disk usage
+# tool_name: disk_check
+# tags: [ops, monitoring]
+# args:
+#   path:
+#     type: string
+#     description: target path
+#     required: false
+# ---
+print("ok")
 ```
 
-After changing config, rebuild index:
+## Integration Pattern
+
+For AI runtime integration, prefer JSON search output:
 
 ```bash
-nanoskills sync
+nanoskills search <intent> --json
 ```
 
-## System Prompt Strategy
+Suggested policy:
 
-To make agents consistently use this registry, add a system prompt rule in your runtime:
+1. try `nanoskills search <intent> --json`
+2. choose best-matching tool from returned JSON
+3. if no match, fall back to normal tool/reasoning flow
 
-```text
-When tool usage is needed, first call:
-`nanoskills search <user_intent> --json`
-Select the best matching tool from returned JSON.
-If no suitable tool is found, then fall back to normal reasoning/tools.
-```
+## Built-in Skills
 
-This pattern works for Claude/Codex/OpenCode/OpenClaw-style runtimes and keeps tool selection behavior stable.
-
-## Docs
-
-- [Positioning](./docs/positioning.md)
-- [Script Skillization](./docs/script-skillization.md)
-- [Runtime Integration](./docs/runtime-integration.md)
-- [Skills Packaging Layout](./docs/skills-packaging.md)
+- [nanoskills_usage_guide](./skills/nanoskills_usager/SKILL.md)
+- [nanoskills_builder](./skills/nanoskills_builder/SKILL.md)
 
 ## Development
 

@@ -1,7 +1,7 @@
 use crate::app::{SyncResult, build_index, search::fuzzy_search};
 use crate::app::{config_service::ConfigService, index_service::IndexService};
 use crate::domain::{Config, ParseError, Skill};
-use crate::infra::scan_files;
+use crate::infra::{ConfigSnapshot, scan_files};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -54,6 +54,10 @@ impl SkillEngine {
 
     pub(crate) fn load_index(&self) -> LoadIndexState {
         self.index_service.load()
+    }
+
+    pub(crate) fn resolve_config_snapshot(&self, local_dir: &Path) -> Result<ConfigSnapshot> {
+        self.config_service.resolve_snapshot(local_dir)
     }
 
     pub(crate) fn resolve_search_limit(

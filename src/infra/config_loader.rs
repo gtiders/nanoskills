@@ -1,6 +1,7 @@
 use crate::domain::Config;
 use anyhow::{Context, Result, bail};
 use rust_i18n::t;
+use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,6 +11,13 @@ const SKILLS_DIR_NAME: &str = "skills";
 pub(crate) enum InitScope {
     Global,
     Local(PathBuf),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConfigSnapshot {
+    pub(crate) default_config: Config,
+    pub(crate) local_config: Option<Config>,
+    pub(crate) effective_config: Config,
 }
 
 /// Resolves nanoskills configuration from global and local scopes.
@@ -238,6 +246,24 @@ fn find_seed_skills_source() -> Result<Option<PathBuf>> {
 /// Resolve nanoskills config relative to a local working directory.
 pub(crate) fn resolve_config(local_dir: &Path) -> Result<Config> {
     ConfigResolver::new(local_dir).resolve()
+}
+
+/// Resolve default config, current-directory local config, and final effective config.
+pub(crate) fn resolve_config_snapshot(local_dir: &Path) -> Result<ConfigSnapshot> {
+    let default_config = Config::default();
+    let local_config_path = local_dir.join(CONFIG_FILE_NAME);
+    let local_config = if local_config_path.exists() {
+        Some(load_config_file(&local_config_path)?)
+    } else {
+        None
+    };
+    let effective_config = resolve_config(local_dir)?;
+
+    Ok(ConfigSnapshot {
+        default_config,
+        local_config,
+        effective_config,
+    })
 }
 
 #[cfg(test)]

@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-03-27
+
+### Added
+
+- New `nanoskills config` command to print three config snapshots: default, current-directory local, and effective merged config.
+- New integration test coverage for config snapshot output (`cli_config_show_test`).
+
+### Changed
+
+- Reworked bundled skills into standardized `SKILL.md` format under:
+  - `skills/nanoskills_builder/SKILL.md`
+  - `skills/nanoskills_usager/SKILL.md`
+- README and README_zh were rewritten and aligned to emphasize:
+  - fast skill retrieval (`skill find`) for agent loops
+  - deep agent/runtime JSON integration
+  - script-based skills beyond Markdown-only systems
+- Repository docs were consolidated into README files (removed standalone `docs/` pages).
+
+### Fixed
+
+- Release workflow packaging verification now checks current bundled skill paths (`skills/nanoskills_builder/SKILL.md`, `skills/nanoskills_usager/SKILL.md`) so tag-triggered releases pass asset validation.
+
 ## [1.0.4] - 2026-03-24
 
 ### Fixed
