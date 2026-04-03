@@ -33,7 +33,7 @@ print("beta")
     )
     .expect("failed to write second skill");
 
-    env.run_sync(&workspace);
+    env.command(&workspace).arg("sync").assert().success();
 
     let assert = env
         .command(&workspace)
@@ -53,4 +53,7 @@ print("beta")
     assert_eq!(skills[0]["name"], "alpha_skill");
     assert_eq!(skills[1]["name"], "beta_skill");
     assert_eq!(skills[0]["description"], "First skill");
+    assert!(skills[0]["tags"].is_array());
+    assert!(skills[0]["path"].is_string());
+    assert!(skills[0].get("parameters").is_none());
 }

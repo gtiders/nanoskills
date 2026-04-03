@@ -5,7 +5,7 @@ use predicates::prelude::*;
 use std::fs;
 
 #[test]
-fn cli_search_json_outputs_machine_readable_tools_array() {
+fn cli_search_json_outputs_lightweight_skill_array() {
     let env = TestEnv::new();
     let workspace = env.root().join("workspace");
     fs::create_dir_all(&workspace).expect("failed to create workspace");
@@ -38,12 +38,12 @@ print("image")
     )
     .expect("failed to write second skill file");
 
-    env.run_sync(&workspace);
+    env.command(&workspace).arg("sync").assert().success();
 
     let mut search = env.command(&workspace);
 
     let assert = search
-        .args(["search", "echo", "--json"])
+        .args(["search", "echo"])
         .assert()
         .success()
         .stdout(predicate::str::starts_with("["));
@@ -51,16 +51,19 @@ print("image")
     let stdout = String::from_utf8(assert.get_output().stdout.clone())
         .expect("stdout should be valid UTF-8");
     let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("search --json should emit a valid JSON array");
-    let tools = json.as_array().expect("top-level JSON should be an array");
+        serde_json::from_str(&stdout).expect("search should emit a valid JSON array");
+    let skills = json.as_array().expect("top-level JSON should be an array");
 
-    assert!(!tools.is_empty(), "search should return at least one tool");
+    assert!(!skills.is_empty(), "search should return at least one skill");
 
-    // 断言输出结构符合 OpenAI tools 约定，而不是只检查一段字符串。
-    assert_eq!(tools[0]["type"], "function");
-    assert_eq!(tools[0]["function"]["name"], "echo_skill");
-    assert_eq!(tools[0]["function"]["description"], "Echo user input");
-    assert_eq!(tools[0]["function"]["parameters"]["type"], "object");
+    assert_eq!(skills[0]["name"], "echo_skill");
+    assert_eq!(skills[0]["description"], "Echo user input");
+    assert_eq!(
+        skills[0]["path"],
+        serde_json::Value::String(workspace.join("echo.py").to_string_lossy().into_owned())
+    );
+    assert!(skills[0]["tags"].is_array());
+    assert!(skills[0].get("parameters").is_none());
 }
 
 #[test]
@@ -93,11 +96,11 @@ print("beta")
     )
     .expect("failed to write beta skill");
 
-    env.run_sync(&workspace);
+    env.command(&workspace).arg("sync").assert().success();
 
     let assert = env
         .command(&workspace)
-        .args(["search", "shared", "--json", "--limit", "1"])
+        .args(["search", "shared", "--limit", "1"])
         .assert()
         .success()
         .stdout(predicate::str::starts_with("["));
@@ -105,11 +108,11 @@ print("beta")
     let stdout = String::from_utf8(assert.get_output().stdout.clone())
         .expect("stdout should be valid UTF-8");
     let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("search --json should emit valid JSON");
-    let tools = json.as_array().expect("top-level JSON should be an array");
+        serde_json::from_str(&stdout).expect("search should emit valid JSON");
+    let skills = json.as_array().expect("top-level JSON should be an array");
 
     // `--limit 1` 必须真的裁剪结果数量，不能只影响展示文案。
-    assert_eq!(tools.len(), 1);
+    assert_eq!(skills.len(), 1);
     // 同分场景下必须按名称排序，确保结果集在不同机器上保持稳定。
-    assert_eq!(tools[0]["function"]["name"], "alpha_skill");
+    assert_eq!(skills[0]["name"], "alpha_skill");
 }

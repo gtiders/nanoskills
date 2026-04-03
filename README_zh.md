@@ -1,123 +1,110 @@
 # nanoskills
 
-面向 AI Agent 深度集成场景的本地高速 Skill 检索 CLI。
+本地优先的 AI Agent 技能库索引与检索 CLI。
 
-## 全面介绍
+## 核心功能
 
-`nanoskills` 重点解决两类核心问题。
+`nanoskills` 解决 Agent 导向技能系统的两个核心问题。
 
-### 1）面向 Agent 工作流的高速 Skill 检索
+### 1) Agent 工作流中的极速技能检索
 
-它会从配置路径构建本地可搜索索引，让检索链路稳定且可复现：
+从配置路径构建本地可搜索索引，保证检索结果稳定可复现：
 
-- 基于全局/本地合并配置扫描技能文件
-- 解析并标准化元数据（`name`、`description`、`tool_name`、`args`、`tags`）
-- 构建本地缓存索引，实现低延迟检索
-- 输出稳定 JSON，直接对接工具调用
+- 扫描全局/本地合并配置下的技能文件
+- 解析标准化元数据（`name`、`description`、`tags`）
+- 构建本地索引缓存，实现低延迟查询
+- 返回稳定的 JSON，用于工具调用集成
 
-这让 `skill find` 在真实 Agent 循环里更快、更稳定。
+### 2) 不止于 Markdown 的技能系统
 
-### 2）Skill 系统不止支持 Markdown
+技能不限于 `.md` 文件。任何脚本或文件只要包含符合文件注释风格的 YAML 头，都可以成为技能。
 
-Skill 不局限于 `.md`。任何脚本/文件，只要按该语言注释风格写入合法 YAML 头部，都可以成为 Skill。
-
-- 保留现有脚本逻辑，不强制重写
-- 仅补充结构化头部用于索引与导出
+- 保持原有脚本逻辑不变
+- 仅需添加结构化头部即可完成索引和工具导出
 - 支持混合仓库（Python/Shell/JS/Rust/Lua/Markdown 等）
-- 通过一技能一目录提升跨运行时迁移能力
+- 一技能一目录，保持跨运行时可移植性
 
-### Markdown-only 与 nanoskills 对比
+### 核心设计
 
-| 维度 | 仅 Markdown 的 Skill 系统 | nanoskills |
-| --- | --- | --- |
-| Skill 载体 | 主要是 `.md` | Markdown + 带 YAML 头部的脚本/文件 |
-| 既有脚本复用 | 常需要重写 | 保留原逻辑，仅补头部 |
-| 检索路径 | 常依赖人工浏览/grep | 索引化本地检索（`sync` -> `search`） |
-| Agent 集成 | 文本提取方式不稳定 | `search --json` 稳定输出 |
-| 配置可见性 | 生效配置不直观 | `nanoskills config` 直接查看三段快照 |
-| 跨运行时迁移 | 依赖各自格式与目录 | 一技能一目录 + 标准元数据 |
-
-## 能力说明
-
-`nanoskills` 提供一条确定性流程：
-
-1. 扫描配置路径
-2. 解析脚本/Markdown 中的 skill 头部
-3. 构建本地索引缓存
-4. 模糊检索 skill
-5. 导出机器可读 JSON 工具定义
-
-关键特点：
-
-- 本地检索速度快，适合高频 skill find
-- JSON 输出稳定，适合 Agent/Runtime 深度集成
-- scan -> index -> search 流程稳定可复现
-
-项目聚焦索引与检索，不负责远程执行或工作流编排。
+- **自动索引** — 首次运行或缓存过期时自动构建/刷新索引（基于 TTL 或配置变更）。`sync` 仍可用于手动重建。
+- **JSON 优先输出** — `search` 和 `list` 始终输出机器可读的 JSON。
+- **模糊搜索** — 对 name、description、tags 进行快速内存评分。路径永不参与搜索。
+- **交互式选择器** — 基于 skim 的 TUI 界面，带语法高亮预览。
 
 ## 安装
 
-Release 安装：
+从 release 安装：
 - https://github.com/gtiders/nanoskills/releases/latest
 
-源码安装：
+从源码安装：
 
 ```bash
 cargo install --path .
 ```
 
-## 快速开始
+## 快速上手
 
 ```bash
 nanoskills init
 nanoskills config
-nanoskills sync --strict
-nanoskills search image --json
+nanoskills search image    # 首次运行自动构建索引
 ```
 
 ## 核心命令
 
-- `nanoskills init`:
-  创建全局配置 `~/.config/nanoskills/.agent-skills.yaml`。
-- `nanoskills init --local`:
-  创建项目本地配置 `./.agent-skills.yaml`。
-- `nanoskills config`:
-  打印三段配置快照：
-  - 默认配置
-  - 当前目录本地配置
-  - 最终生效配置（合并后）
-- `nanoskills sync`:
-  扫描并重建本地索引。
-- `nanoskills sync --strict`:
-  严格模式，遇到非法头部直接报错。
-- `nanoskills search <query> [--limit N]`:
-  模糊检索技能。
-- `nanoskills search <query> --json`:
-  导出可直接用于工具调用的 JSON。
-- `nanoskills list [--json] [--detailed]`:
-  列出已索引技能。
-- `nanoskills pick`:
-  交互式 TUI（仅人类交互，不适合自动化）。
+| 命令 | 说明 |
+|---|---|
+| `init` | 在 `~/.config/nanoskills/.agent-skills.yaml` 创建全局配置。`--local` 创建项目级配置。 |
+| `config` | 打印默认配置、本地配置和最终合并配置。 |
+| `sync` | 扫描并重建本地索引缓存。`--strict` 会在遇到格式错误的头部时报错退出。 |
+| `search <query>` | 对索引技能进行模糊搜索。始终输出 JSON：`[{name, tags, description, path}, …]` |
+| `list` | 列出所有已索引技能，输出 JSON。`nanoskills list --json` 输出紧凑格式。 |
+| `pick` | 交互式 TUI 选择器，带预览。 |
 
-## 配置模型
+### Search 和 List
 
-配置文件位置：
+两个命令均只输出 JSON：
 
-- 全局：`~/.config/nanoskills/.agent-skills.yaml`
-- 本地：`./.agent-skills.yaml`
+```json
+[
+  {
+    "name": "image_resize",
+    "tags": ["image", "python"],
+    "description": "使用 PIL 调整图片尺寸",
+    "path": "./skills/image_resize"
+  }
+]
+```
 
-最终生效配置计算顺序：
+`search` 对 `name`、`description`、`tags` 进行模糊匹配。`path` 永不参与搜索。
 
-1. 读取全局配置（若存在）
-2. 读取本地配置（若存在）
-3. 合并全局 + 本地：
-   - 列表字段（`scan_paths`、`ignore_patterns`）：本地去重追加
-   - 标量字段（`max_file_size`、`search_limit`、`language`）：本地覆盖全局
-4. 若缺失则在 `scan_paths` 前置注入 `~/.config/nanoskills/skills`
+### 索引生命周期
 
-使用 `nanoskills config` 查看真实生效结果。
+索引由程序自动管理：
 
-## 最小配置示例
+- **首次运行** — 在首次查询前自动构建并缓存索引
+- **缓存过期** — 若距上次同步已超过 `cache_ttl_seconds`，查询前静默重建索引
+- **配置变更** — 若 `scan_paths`、`ignore_patterns` 或 `max_file_size` 与上次同步时不同，查询前静默重建索引
+- **手动同步** — `nanoskills sync` 始终触发重建并打印进度
+
+```
+$ nanoskills search image
+[cache stale, refreshing…]
+[
+  { "name": "image_resize", ... }
+]
+```
+
+## 配置
+
+配置文件：
+
+- **全局**：`~/.config/nanoskills/.agent-skills.yaml`
+- **本地**：`./.agent-skills.yaml`（项目级，与全局配置合并）
+
+使用 `nanoskills config` 查看实际生效的运行时配置。
+
+### 最简配置
 
 ```yaml
 scan_paths:
@@ -128,57 +115,81 @@ ignore_patterns:
   - .git
 max_file_size: 1MB
 search_limit: 10
-language: en
+cache_ttl_seconds: 1h
 ```
 
-## Skill 头部要求
+### 缓存 TTL
 
-最小字段：
+支持时长格式：`30s`、`5m`、`2h`、`1d` 或纯秒数。默认为 `1h`。设为 `0` 可禁用基于 TTL 的刷新（仅在配置变更或显式 `sync` 时重建）。
+
+## 技能头部规范
+
+技能是任何包含 YAML 块（使用文件注释语法）的文件。
+
+**必填字段：**
 
 - `name`
 - `description`
 
-推荐字段：
+**推荐字段：**
 
-- `tool_name`（稳定工具标识）
-- `tags`
-- `args`
+- `tags`（字符串标签列表）
+- `args`（参数定义）
 
-Python 示例：
+### Python 示例
 
 ```python
 # ---
 # name: disk_check
-# description: Check disk usage
-# tool_name: disk_check
+# description: 检查磁盘使用情况
 # tags: [ops, monitoring]
 # args:
 #   path:
 #     type: string
-#     description: target path
+#     description: 目标路径
 #     required: false
 # ---
 print("ok")
 ```
 
-## 集成模式
-
-与 AI Runtime 集成时，优先使用：
+### Shell 示例
 
 ```bash
-nanoskills search <intent> --json
+#!/bin/bash
+# ---
+# name: git_log
+# description: 显示最近提交
+# tags: [git, vcs]
+# ---
+git log --oneline -10
 ```
 
-建议策略：
+## 项目结构
 
-1. 先执行 `nanoskills search <intent> --json`
-2. 从返回 JSON 中选择最匹配工具
-3. 若无匹配，再回退默认工具/推理流程
+```
+src/
+  model/        # 领域类型：Skill, Index, Config, JsonView
+  io/           # 文件系统操作：scanner, parser, index_store, config_loader
+  services/     # 业务逻辑：engine, index_service, search, sync
+  cli/          # 表现层：commands, picker (skim), output
+```
 
-## 内置 Skills
+## 依赖
 
-- [nanoskills_usage_guide](./skills/nanoskills_usager/SKILL.md)
-- [nanoskills_builder](./skills/nanoskills_builder/SKILL.md)
+| Crate | 用途 |
+|---|---|
+| `anyhow` | 错误处理 |
+| `clap` | CLI 参数解析 |
+| `comfy-table` | `list` 的人类可读表格输出 |
+| `dirs` | 平台相关的配置目录 |
+| `dunce` | 路径规范化 |
+| `fuzzy-matcher` | name + description + tags 内存模糊评分 |
+| `ignore` | 快速 glob/gitignore 模式匹配 |
+| `rayon` | 并行文件扫描 |
+| `serde` / `serde_yaml` / `serde_json` | 序列化 |
+| `skim` | 交互式 TUI 选择器 |
+| `syntect` | 选择器预览的语法高亮 |
+| `path-clean` | 路径清理 |
 
 ## 开发
 

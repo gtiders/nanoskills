@@ -5,7 +5,6 @@ use tempfile::TempDir;
 
 pub(crate) struct TestEnv {
     temp_dir: TempDir,
-    cache_dir: PathBuf,
     config_dir: PathBuf,
     home_dir: PathBuf,
 }
@@ -23,7 +22,6 @@ impl TestEnv {
 
         Self {
             temp_dir,
-            cache_dir,
             config_dir,
             home_dir,
         }
@@ -33,16 +31,14 @@ impl TestEnv {
         self.temp_dir.path()
     }
 
-    pub(crate) fn cache_dir(&self) -> &Path {
-        &self.cache_dir
+    pub(crate) fn cache_dir(&self) -> PathBuf {
+        self.home_dir.join(".cache")
     }
 
-    #[allow(dead_code)]
     pub(crate) fn global_config_dir(&self) -> PathBuf {
         self.config_dir.join("nanoskills")
     }
 
-    #[allow(dead_code)]
     pub(crate) fn global_config_file(&self) -> PathBuf {
         self.global_config_dir().join(".agent-skills.yaml")
     }
@@ -53,6 +49,9 @@ impl TestEnv {
 
     pub(crate) fn command(&self, workspace: &Path) -> Command {
         let mut cmd = Command::cargo_bin("nanoskills").expect("binary should build");
+        let _ = self.cache_dir();
+        let _ = self.global_config_dir();
+        let _ = self.global_config_file();
         cmd.current_dir(workspace);
         for (key, value) in self.command_envs() {
             cmd.env(key, value);
@@ -62,8 +61,4 @@ impl TestEnv {
         cmd
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn run_sync(&self, workspace: &Path) {
-        self.command(workspace).arg("sync").assert().success();
-    }
 }

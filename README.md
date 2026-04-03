@@ -1,8 +1,8 @@
 # nanoskills
 
-A local-first, fast skill-retrieval CLI for deep AI agent integration.
+A local-first, fast skill-retrieval CLI for AI agent integration.
 
-## Comprehensive Overview
+## What It Does
 
 `nanoskills` solves two core problems for agent-oriented skill systems.
 
@@ -11,49 +11,25 @@ A local-first, fast skill-retrieval CLI for deep AI agent integration.
 It builds a local searchable index from configured paths and keeps retrieval deterministic:
 
 - scan skill files from global/local merged config
-- parse normalized metadata (`name`, `description`, `tool_name`, `args`, `tags`)
-- build a local cache index for low-latency lookup
+- parse normalized metadata (`name`, `description`, `tags`)
+- build a local index cache for low-latency lookup
 - return stable JSON for tool-call integration
-
-This makes `skill find` fast and repeatable in real agent loops.
 
 ### 2) Skill System Beyond Markdown
 
 A skill is not limited to `.md`. Any script/file can be a skill as long as it contains a valid YAML header in the file's comment style.
 
 - keep existing script logic unchanged
-- add structured header for indexing and tool export
+- add a structured header for indexing and tool export
 - support mixed repositories (Python/Shell/JS/Rust/Lua/Markdown, etc.)
 - keep one-skill-per-folder layout for portability across runtimes
 
-### Markdown-only vs nanoskills
+### Key Design
 
-| Dimension | Markdown-only skill system | nanoskills |
-| --- | --- | --- |
-| Skill carrier | Mostly `.md` | Markdown + scripts/files with YAML header |
-| Existing script reuse | Usually requires rewrite | Keep original script logic, add header only |
-| Retrieval path | Often file browsing/manual grep | Indexed local search (`sync` -> `search`) |
-| Agent integration | Ad-hoc text extraction | Stable `search --json` tool output |
-| Config visibility | Implicit | Explicit via `nanoskills config` snapshots |
-| Cross-runtime portability | Varies by format/layout | One-skill-per-folder + normalized metadata |
-
-## What It Does
-
-`nanoskills` provides one deterministic pipeline:
-
-1. scan configured paths
-2. parse skill headers from scripts/markdown
-3. build a local index cache
-4. retrieve by fuzzy search
-5. export machine-readable JSON tool definitions
-
-Key characteristics:
-
-- fast local retrieval for frequent skill find workflows
-- stable JSON output for deep agent/runtime integration
-- deterministic scan -> index -> search flow
-
-It focuses on indexing and retrieval. It is not a remote execution or workflow orchestration system.
+- **auto-indexing** — the index is built and refreshed automatically on first run or when stale (TTL-based or config changed). `sync` is still available for manual rebuilds.
+- **JSON-first output** — `search` and `list` always emit machine-readable JSON.
+- **fuzzy search** — fast in-memory scoring across name, description, and tags. Paths are never part of the search corpus.
+- **interactive picker** — skim-based TUI for human browsing, with syntax-highlighted preview.
 
 ## Install
 
@@ -71,53 +47,64 @@ cargo install --path .
 ```bash
 nanoskills init
 nanoskills config
-nanoskills sync --strict
-nanoskills search image --json
+nanoskills search image    # auto-builds index on first run
 ```
 
 ## Core Commands
 
-- `nanoskills init`:
-  Create global config at `~/.config/nanoskills/.agent-skills.yaml`.
-- `nanoskills init --local`:
-  Create local config at `./.agent-skills.yaml`.
-- `nanoskills config`:
-  Print three snapshots:
-  - default config
-  - current-directory local config
-  - effective merged config
-- `nanoskills sync`:
-  Scan + rebuild local index cache.
-- `nanoskills sync --strict`:
-  Fail on malformed/invalid headers.
-- `nanoskills search <query> [--limit N]`:
-  Fuzzy search indexed skills.
-- `nanoskills search <query> --json`:
-  Export tool-call-ready JSON.
-- `nanoskills list [--json] [--detailed]`:
-  List indexed skills.
-- `nanoskills pick`:
-  Interactive TUI (human only, not for automation).
+| Command | Description |
+|---|---|
+| `init` | Create global config at `~/.config/nanoskills/.agent-skills.yaml`. Use `--local` for a project-level config. |
+| `config` | Print default, local, and effective merged config. |
+| `sync` | Scan and rebuild the local index cache. Use `--strict` to fail on malformed headers. |
+| `search <query>` | Fuzzy search indexed skills. Always outputs JSON: `[{name, tags, description, path}, …]` |
+| `list` | List all indexed skills as JSON. Use `nanoskills list --json` for compact output. |
+| `pick` | Interactive TUI picker with preview. |
 
-## Configuration Model
+### Search and List
+
+Both commands emit JSON only:
+
+```json
+[
+  {
+    "name": "image_resize",
+    "tags": ["image", "python"],
+    "description": "Resize an image using PIL",
+    "path": "./skills/image_resize"
+  }
+]
+```
+
+`search` fuzzy-matches across `name`, `description`, and `tags`. `path` is never part of the search corpus.
+
+### The Index Lifecycle
+
+The index is managed automatically:
+
+- **first run** — builds and caches the index automatically before the first query
+- **cache stale** — if `cache_ttl_seconds` has elapsed since the last sync, the index is rebuilt silently before the query
+- **config changed** — if `scan_paths`, `ignore_patterns`, or `max_file_size` differ from the last sync, the index is rebuilt silently
+- **manual sync** — `nanoskills sync` always triggers a rebuild and prints progress
+
+```
+$ nanoskills search image
+[cache stale, refreshing…]
+[
+  { "name": "image_resize", ... }
+]
+```
+
+## Configuration
 
 Config files:
 
-- global: `~/.config/nanoskills/.agent-skills.yaml`
-- local: `./.agent-skills.yaml`
-
-Effective config is computed as:
-
-1. read global (if exists)
-2. read local (if exists)
-3. merge global + local
-   - list fields (`scan_paths`, `ignore_patterns`): append local unique items
-   - scalar fields (`max_file_size`, `search_limit`, `language`): local overrides global
-4. inject global shared skills path `~/.config/nanoskills/skills` into `scan_paths` front (if missing)
+- **global**: `~/.config/nanoskills/.agent-skills.yaml`
+- **local**: `./.agent-skills.yaml` (project-level, merged with global)
 
 Use `nanoskills config` to inspect the exact runtime result.
 
-## Minimal Config Example
+### Minimal Config
 
 ```yaml
 scan_paths:
@@ -128,29 +115,33 @@ ignore_patterns:
   - .git
 max_file_size: 1MB
 search_limit: 10
-language: en
+cache_ttl_seconds: 1h
 ```
+
+### Cache TTL
+
+Accepts durations: `30s`, `5m`, `2h`, `1d`, or plain seconds. Default is `1h`. Set to `0` to disable TTL-based refresh (rebuild only on config change or explicit `sync`).
 
 ## Skill Header Requirements
 
-Minimum header fields:
+A skill is any file containing a YAML block in its comment syntax.
+
+**Minimum fields:**
 
 - `name`
 - `description`
 
-Recommended fields:
+**Recommended fields:**
 
-- `tool_name` (stable tool id)
-- `tags`
-- `args`
+- `tags` (list of string tags)
+- `args` (parameter definitions)
 
-Python example:
+### Python Example
 
 ```python
 # ---
 # name: disk_check
 # description: Check disk usage
-# tool_name: disk_check
 # tags: [ops, monitoring]
 # args:
 #   path:
@@ -161,24 +152,44 @@ Python example:
 print("ok")
 ```
 
-## Integration Pattern
-
-For AI runtime integration, prefer JSON search output:
+### Shell Example
 
 ```bash
-nanoskills search <intent> --json
+#!/bin/bash
+# ---
+# name: git_log
+# description: Show recent commits
+# tags: [git, vcs]
+# ---
+git log --oneline -10
 ```
 
-Suggested policy:
+## Architecture
 
-1. try `nanoskills search <intent> --json`
-2. choose best-matching tool from returned JSON
-3. if no match, fall back to normal tool/reasoning flow
+```
+src/
+  model/        # domain types: Skill, Index, Config, JsonView
+  io/           # filesystem: scanner, parser, index_store, config_loader
+  services/     # business logic: engine, index_service, search, sync
+  cli/          # presentation: commands, picker (skim), output
+```
 
-## Built-in Skills
+## Dependencies
 
-- [nanoskills_usage_guide](./skills/nanoskills_usager/SKILL.md)
-- [nanoskills_builder](./skills/nanoskills_builder/SKILL.md)
+| Crate | Role |
+|---|---|
+| `anyhow` | Error handling |
+| `clap` | CLI argument parsing |
+| `comfy-table` | Human-readable table output for `list` |
+| `dirs` | Platform-specific config directory |
+| `dunce` | Path normalization |
+| `fuzzy-matcher` | In-memory fuzzy scoring (name + description + tags) |
+| `ignore` | Fast glob/gitignore pattern matching |
+| `rayon` | Parallel file scanning |
+| `serde` / `serde_yaml` / `serde_json` | Serialization |
+| `skim` | Interactive TUI picker |
+| `syntect` | Syntax highlighting in picker preview |
+| `path-clean` | Path cleaning |
 
 ## Development
 
