@@ -301,7 +301,6 @@ scan_paths:
 ignore_patterns:
   - dist
 max_file_size: 2MB
-language: zh-CN
 "#,
         )
         .expect("failed to write local config");
@@ -325,7 +324,7 @@ language: zh-CN
         assert_eq!(config.ignore_patterns, vec!["target", "dist"]);
         assert_eq!(config.search_limit, 8);
         assert_eq!(config.max_file_size, 2 * 1024 * 1024);
-        assert_eq!(config.language.as_deref(), Some("zh-CN"));
+        assert!(!config.copy_to_clipboard_on_pick);
     }
 
     #[test]

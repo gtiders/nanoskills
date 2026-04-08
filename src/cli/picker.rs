@@ -1,6 +1,7 @@
 use crate::model::Skill;
 use anyhow::{Result, anyhow};
 use skim::prelude::*;
+use skim::tui::BorderType;
 use std::borrow::Cow;
 use std::sync::Arc;
 use syntect::easy::HighlightLines;
@@ -39,7 +40,9 @@ pub(crate) fn run_skim_picker(items: Vec<Skill>) -> Result<Option<Skill>> {
 
 fn build_options() -> Result<SkimOptions> {
     Ok(SkimOptionsBuilder::default()
-        .height("100%")
+        .no_height(true)
+        .border(BorderType::Rounded)
+        .color("catppuccin-frappe")
         .highlight_line(true)
         .preview("")
         .multi(false)
@@ -56,10 +59,7 @@ struct PickerItem {
 
 impl PickerItem {
     fn new(skill: Skill) -> Self {
-        let search_text = format!(
-            "{description}",
-            description = skill.description
-        );
+        let search_text = skill.description.clone();
 
         Self { skill, search_text }
     }
@@ -114,6 +114,6 @@ fn render_preview(skill: &Skill) -> String {
 fn select_theme(theme_set: &ThemeSet) -> Option<&Theme> {
     theme_set
         .themes
-        .get("base16-ocean.dark")
+        .get("base16-mocha.dark")
         .or_else(|| theme_set.themes.values().next())
 }

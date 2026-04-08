@@ -1,36 +1,154 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
-- `src/` contains the Rust application code, split by layers:
-- `src/domain/`: core models (`skill`, `index`, `tool_name`).
-- `src/infra/`: filesystem scanning, parsing, config loading, and index storage.
-- `src/app/`: orchestration/services (`sync`, `search`, engine logic).
-- `src/presentation/`: CLI commands and TUI/output rendering.
-- `tests/` holds integration-style CLI tests (for example `cli_search_test.rs`) plus shared helpers in `tests/common/`.
-- `locales/` stores i18n YAML files; `test_scripts/` contains sample skill files used for parsing/index coverage.
+This guide is for coding agents working in `nanoskills`. It reflects current repo structure, Cargo config, tests, and README.
 
-## Build, Test, and Development Commands
-- `cargo build` compiles debug binaries.
-- `cargo build --release` builds optimized binaries.
-- `cargo run -- <command>` runs locally, e.g. `cargo run -- search image`.
-- `cargo test` runs all tests in `tests/` and unit tests.
-- `cargo fmt` formats code with `rustfmt` defaults.
-- `cargo clippy --all-targets --all-features -D warnings` enforces lint cleanliness.
-- `cargo install --path .` installs the local CLI as `nanoskills`.
+## 1) Project Snapshot
 
-## Coding Style & Naming Conventions
-- Follow idiomatic Rust 2024 style and keep code `rustfmt`-clean.
-- Use `snake_case` for modules/functions/files, `PascalCase` for types, and `SCREAMING_SNAKE_CASE` for constants.
-- Keep module responsibilities narrow by layer (domain vs infra vs app vs presentation).
-- Prefer descriptive command/service names (`config_loader`, `index_service`, `tool_name_resolver`).
+- Language: Rust (edition `2024`)
+- Build system: Cargo
+- Binary crate: `nanoskills`
+- Domain: local-first skill indexing/search CLI
+- Entrypoint: `src/main.rs`
 
-## Testing Guidelines
-- Place behavior-driven CLI coverage in `tests/` using `assert_cmd`, `predicates`, and `tempfile`.
-- Name test files with the `*_test.rs` pattern and group helper utilities under `tests/common/`.
-- Add regression tests for each command change (`init`, `sync`, `search`, `list`, `pick`) and config-resolution edge cases.
-- Run `cargo test` before pushing; include tests for bug fixes.
+```text
+src/
+  cli/         # clap parsing + command handlers + output
+  io/          # config loading, scanning, parsing, index persistence
+  model/       # domain structs + serde models
+  services/    # engine, indexing, search, sync orchestration
+tests/         # integration tests (assert_cmd + predicates)
+skills/        # seed skills packaged with release artifacts
+```
 
-## Commit & Pull Request Guidelines
-- Follow Conventional Commit style seen in history: `feat:`, `fix:`, `refactor:`, `docs:`, `build:`, `release:`.
-- Keep subjects imperative and scoped (example: `fix: support global and local init config scopes`).
-- PRs should include a concise behavior summary, linked issue(s) when relevant, before/after CLI output (or TUI screenshots), and confirmation that `cargo fmt`, `cargo clippy`, and `cargo test` passed.
+## 2) Build / Lint / Test Commands
+
+Run from repo root: `/home/gwins/Documents/nanoskills`.
+
+### Core commands
+
+```bash
+cargo build
+cargo build --release
+cargo check
+cargo fmt
+cargo clippy --all-targets --all-features -D warnings
+cargo test
+```
+
+### Single-test workflows (important)
+
+Run one integration test file:
+
+```bash
+cargo test --test cli_search_test
+```
+
+Run one specific test function:
+
+```bash
+cargo test --test cli_search_test cli_search_json_outputs_lightweight_skill_array -- --nocapture
+```
+
+Alternative name filter:
+
+```bash
+cargo test cli_search_json_outputs_lightweight_skill_array -- --nocapture
+```
+
+Run tests in a specific module area under `src`:
+
+```bash
+cargo test io::config_loader
+```
+
+## 3) CI / Release Behavior
+
+- Workflow: `.github/workflows/release.yml`
+- Trigger: push tag `v*`
+- Release targets:
+  - `x86_64-unknown-linux-gnu`
+  - `x86_64-unknown-linux-musl`
+  - `x86_64-apple-darwin`
+  - `aarch64-apple-darwin`
+  - `x86_64-pc-windows-msvc`
+- Packaged assets include: `LICENSE`, `README.md`, `README_zh.md`, `skills/`
+
+If you touch packaging or startup defaults, verify this workflow.
+
+## 4) Code Style and Conventions
+
+### Visibility and API boundaries
+
+- Prefer `pub(crate)` for internal APIs.
+- Keep public surface minimal (single binary crate).
+
+### Naming
+
+- Types/traits/enums: `PascalCase`
+- Functions/modules/variables: `snake_case`
+- Constants: `SCREAMING_SNAKE_CASE`
+- Tests: descriptive `snake_case` behavior names
+
+### Imports and formatting
+
+Typical import order:
+1. `use crate::...`
+2. external crates (`anyhow`, `clap`, `serde`, ...)
+3. `std::...`
+
+Let `rustfmt` own formatting; avoid manual style drift.
+
+### Error handling
+
+- Prefer `anyhow::Result` in application flow.
+- Add context at IO/serialization boundaries via `.context(...)` / `.with_context(...)`.
+- Use `bail!` for validated early exits.
+- Prefer `?` propagation over manual branching.
+- Preserve `main` error-chain output style (`error.chain().skip(1)`).
+
+Avoid in non-test code: `unwrap()`, `expect()`, and swallowed errors.
+
+### Serialization / config behavior
+
+- Use `serde` derives + field attributes for defaults/custom parsing.
+- Keep parsing backward-compatible where practical.
+- Preserve human-readable values in config (`1MB`, `1h`, etc.; see `model/config.rs`).
+
+### CLI and output behavior
+
+- CLI shape is defined in `src/cli/cli.rs` via `clap` derive macros.
+- Command handlers should remain thin and delegate to `services`.
+- JSON output is a core contract; avoid breaking machine-readable fields.
+
+### Determinism and comments
+
+- Keep search/list ordering deterministic (tests assert stable tie behavior).
+- Keep comments brief and intent-focused; existing code mixes concise English docs with occasional Chinese explanatory comments.
+
+## 5) Testing Conventions
+
+- Integration tests: `tests/*.rs`
+- Shared harness: `tests/common/mod.rs` (`TestEnv`)
+- Binary invocation pattern: `assert_cmd::Command::cargo_bin("nanoskills")`
+- Test envs set locale and HOME (`LANG`, `LC_ALL`, `HOME`) for reproducibility.
+
+When adding features:
+- Prefer integration tests for CLI-visible behavior.
+- Assert stdout/stderr with `predicates`.
+- Validate JSON via `serde_json` parsing, not only string matching.
+
+## 6) Agent Workflow Expectations
+
+Before editing: read nearby modules/tests and match existing naming/import/error-context patterns.
+
+After editing: run `cargo fmt`, `cargo clippy --all-targets --all-features -D warnings`, then targeted tests (and `cargo test` for broader changes).
+
+## 7) Cursor / Copilot Rule Files
+
+No repository-level rule files found at time of writing:
+
+- `.cursorrules` (not found)
+- `.cursor/rules/` (not found)
+- `.github/copilot-instructions.md` (not found)
+
+If these are added later, treat them as higher-priority instructions and update this file.

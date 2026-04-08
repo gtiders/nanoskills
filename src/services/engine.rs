@@ -105,6 +105,11 @@ impl SkillEngine {
     pub(crate) fn search<'a>(&self, skills: &'a [Skill], query: &str) -> Vec<(&'a Skill, i64)> {
         fuzzy_search(skills, query)
     }
+
+    pub(crate) fn copy_to_clipboard_on_pick(&self, local_dir: &Path) -> Result<bool> {
+        let config = self.config_service.resolve(local_dir)?;
+        Ok(config.copy_to_clipboard_on_pick)
+    }
 }
 
 fn current_unix_timestamp() -> u64 {

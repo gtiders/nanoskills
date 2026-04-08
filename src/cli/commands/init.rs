@@ -18,6 +18,7 @@ pub(crate) fn run_init(engine: &SkillEngine, force: bool, local: bool) -> Result
     println!("Scan Paths: {:?}", config.scan_paths);
     println!("Max File Size: {}", config.max_file_size);
     println!("Search Limit: {}", config.search_limit);
+    println!("Copy to Clipboard on Pick: {}", config.copy_to_clipboard_on_pick);
 
     Ok(())
 }
