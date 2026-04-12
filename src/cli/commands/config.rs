@@ -1,7 +1,7 @@
 use crate::services::SkillEngine;
 use anyhow::Result;
 
-/// Handle `nanoskills config`.
+/// Handle `skillscripts config`.
 pub(crate) fn run_config(engine: &SkillEngine) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let snapshot = engine.resolve_config_snapshot(&current_dir)?;

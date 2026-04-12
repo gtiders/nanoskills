@@ -26,7 +26,7 @@ print("hello")
 
     fs::write(
         workspace.join("README.md"),
-        "This file has no nanoskills header.\n",
+        "This file has no skillscripts header.\n",
     )
     .expect("failed to write plain text file");
 
@@ -40,7 +40,7 @@ print("hello")
         .success()
         .stderr(predicate::str::is_empty());
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     assert!(index_path.exists(), "sync should create cache index");
 
     let index_text = fs::read_to_string(&index_path).expect("failed to read generated index");
@@ -71,7 +71,7 @@ fn cli_sync_warns_when_scan_path_does_not_exist() {
     fs::create_dir_all(&global_skills_dir).expect("failed to create global skills dir");
 
     fs::write(
-        workspace.join(".agent-skills.yaml"),
+        workspace.join("skillscripts.yaml"),
         r#"
 scan_paths:
   - ./missing-skills
@@ -132,7 +132,7 @@ print("broken")
         "strict sync should only keep valid skills: {stdout}"
     );
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     let index_text = fs::read_to_string(&index_path).expect("failed to read generated index");
     let index_json: serde_json::Value =
         serde_json::from_str(&index_text).expect("generated index should be valid JSON");

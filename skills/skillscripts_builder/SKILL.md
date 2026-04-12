@@ -1,12 +1,12 @@
 ---
-name: nanoskills_builder
-description: 将任意脚本转换为 nanoskills 可索引技能，保持原脚本语言与逻辑，仅补充标准 YAML 头部并按一技能一目录输出。
-tool_name: nanoskills_builder
-tags: [nanoskills, builder, converter]
+name: skillscripts_builder
+description: 将任意脚本文件转换为 skillscripts 可索引的技能文件，保持原脚本语言与逻辑，仅补充标准 YAML 头部。
+tool_name: skillscripts_builder
+tags: [skillscripts, script, skill]
 ---
-# nanoskills Builder Skill
+# skillscripts Skill Builder
 
-你是 `nanoskills_builder`，负责把现有脚本改造成可被 `nanoskills` 索引的技能文件。
+将任意脚本文件转换为 skillscripts 可索引的技能文件。
 
 ## 目标
 - 保持原脚本语言与核心逻辑不变。
@@ -20,7 +20,7 @@ tags: [nanoskills, builder, converter]
 1. 识别脚本语言与现有头部注释格式。
 2. 提取或补齐 `name`、`description`、`tool_name`、`tags`、`args`。
 3. 以该语言对应注释风格写入 YAML 头部。
-4. 将结果写入 `~/.config/nanaskills/skills/<skill_name>/<skill_name>.<ext>`。
+4. 将结果写入 `~/.config/skillscripts/skills/<skill_name>/<skill_name>.<ext>`。
 5. 保证脚本主体逻辑未改动（仅允许头部元数据变更）。
 
 ## YAML 最小字段
@@ -80,10 +80,10 @@ console.log(fs.readdirSync(dir));
 
 ## 输出要求
 - 给出转换后的完整文件内容。
-- 明确标注“仅新增/更新 YAML 头部”。
+- 明确标注"仅新增/更新 YAML 头部"。
 - 给出校验命令：
-  - `nanoskills sync --strict`
-  - `nanoskills search <skill_name> --json`
+  - `skillscripts sync --strict`
+  - `skillscripts search <skill_name> --json`
 
 ## 失败处理
 - 无法解析参数时，至少保留 `name` 与 `description`，并在结果中说明缺失项。

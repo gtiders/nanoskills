@@ -1,10 +1,10 @@
-# nanoskills
+# skillscripts
 
 A local-first, fast skill-retrieval CLI for AI agent integration.
 
 ## What It Does
 
-`nanoskills` solves two core problems for agent-oriented skill systems.
+`skillscripts` (alias `sks`) solves two core problems for agent-oriented skill systems.
 
 ### 1) Fast Skill Retrieval for Agent Workflows
 
@@ -34,7 +34,7 @@ A skill is not limited to `.md`. Any script/file can be a skill as long as it co
 ## Install
 
 From release:
-- https://github.com/gtiders/nanoskills/releases/latest
+- https://github.com/gtiders/skillscripts/releases/latest
 
 From source:
 
@@ -45,20 +45,23 @@ cargo install --path .
 ## Quick Start
 
 ```bash
-nanoskills init
-nanoskills config
-nanoskills search image    # auto-builds index on first run
+skillscripts init
+skillscripts config
+skillscripts search image    # auto-builds index on first run
+# or use the short alias
+sks init
+sks search image
 ```
 
 ## Core Commands
 
 | Command | Description |
 |---|---|
-| `init` | Create global config at `~/.config/nanoskills/.agent-skills.yaml`. Use `--local` for a project-level config. |
+| `init` | Create global config at `~/.config/skillscripts/skillscripts.yaml`. Use `--local` for a project-level config. |
 | `config` | Print default, local, and effective merged config. |
 | `sync` | Scan and rebuild the local index cache. Use `--strict` to fail on malformed headers. |
 | `search <query>` | Fuzzy search indexed skills. Always outputs JSON: `[{name, tags, description, path}, …]` |
-| `list` | List all indexed skills as JSON. Use `nanoskills list --json` for compact output. |
+| `list` | List all indexed skills as JSON. Use `skillscripts list --json` for compact output. |
 | `pick` | Interactive TUI picker with preview. |
 
 ### Search and List
@@ -85,10 +88,10 @@ The index is managed automatically:
 - **first run** — builds and caches the index automatically before the first query
 - **cache stale** — if `cache_ttl_seconds` has elapsed since the last sync, the index is rebuilt silently before the query
 - **config changed** — if `scan_paths`, `ignore_patterns`, or `max_file_size` differ from the last sync, the index is rebuilt silently
-- **manual sync** — `nanoskills sync` always triggers a rebuild and prints progress
+- **manual sync** — `skillscripts sync` always triggers a rebuild and prints progress
 
 ```
-$ nanoskills search image
+$ skillscripts search image
 [cache stale, refreshing…]
 [
   { "name": "image_resize", ... }
@@ -99,10 +102,10 @@ $ nanoskills search image
 
 Config files:
 
-- **global**: `~/.config/nanoskills/.agent-skills.yaml`
-- **local**: `./.agent-skills.yaml` (project-level, merged with global)
+- **global**: `~/.config/skillscripts/skillscripts.yaml`
+- **local**: `./skillscripts.yaml` (project-level, merged with global)
 
-Use `nanoskills config` to inspect the exact runtime result.
+Use `skillscripts config` to inspect the exact runtime result.
 
 ### Minimal Config
 

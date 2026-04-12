@@ -4,7 +4,7 @@ const DEFAULT_MAX_FILE_SIZE: u64 = 1024 * 1024;
 const DEFAULT_SEARCH_LIMIT: usize = 5;
 const DEFAULT_CACHE_TTL_SECONDS: u64 = 3600;
 
-/// User configuration loaded from `.agent-skills.yaml`.
+/// User configuration loaded from `skillscripts.yaml`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Config {
     #[serde(default)]
@@ -26,7 +26,7 @@ pub(crate) struct Config {
     )]
     pub(crate) cache_ttl_seconds: u64,
     #[serde(default)]
-    pub(crate) language: Option<String>,
+    pub(crate) copy_to_clipboard_on_pick: bool,
 }
 
 fn default_max_file_size() -> u64 {
@@ -49,7 +49,7 @@ impl Default for Config {
             max_file_size: DEFAULT_MAX_FILE_SIZE,
             search_limit: DEFAULT_SEARCH_LIMIT,
             cache_ttl_seconds: DEFAULT_CACHE_TTL_SECONDS,
-            language: None,
+            copy_to_clipboard_on_pick: false,
         }
     }
 }
@@ -75,8 +75,8 @@ impl Config {
             merged.cache_ttl_seconds = other.cache_ttl_seconds;
         }
 
-        if let Some(language) = &other.language {
-            merged.language = Some(language.clone());
+        if other.copy_to_clipboard_on_pick {
+            merged.copy_to_clipboard_on_pick = other.copy_to_clipboard_on_pick;
         }
 
         merged
@@ -236,7 +236,7 @@ mod tests {
             max_file_size: DEFAULT_MAX_FILE_SIZE,
             search_limit: DEFAULT_SEARCH_LIMIT,
             cache_ttl_seconds: DEFAULT_CACHE_TTL_SECONDS,
-            language: Some("en".into()),
+            copy_to_clipboard_on_pick: true,
         };
         let local = Config {
             scan_paths: vec!["/shared".into(), "./local".into()],
@@ -244,22 +244,20 @@ mod tests {
             max_file_size: 2 * 1024 * 1024,
             search_limit: 9,
             cache_ttl_seconds: 120,
-            language: Some("zh-CN".into()),
+            copy_to_clipboard_on_pick: true,
         };
 
         let merged = global.merge(&local);
 
-        // 列表字段需要去重并保留全局在前、本地追加的顺序。
         assert_eq!(
             merged.scan_paths,
             vec!["/global/skills", "/shared", "./local"]
         );
         assert_eq!(merged.ignore_patterns, vec!["target", "dist"]);
-        // 标量字段由更具体的本地配置覆盖。
         assert_eq!(merged.max_file_size, 2 * 1024 * 1024);
         assert_eq!(merged.search_limit, 9);
         assert_eq!(merged.cache_ttl_seconds, 120);
-        assert_eq!(merged.language.as_deref(), Some("zh-CN"));
+        assert!(merged.copy_to_clipboard_on_pick);
     }
 
     #[test]
@@ -270,16 +268,15 @@ mod tests {
             max_file_size: 2 * 1024 * 1024,
             search_limit: 20,
             cache_ttl_seconds: 7200,
-            language: Some("en".into()),
+            copy_to_clipboard_on_pick: true,
         };
         let local = Config::default();
 
         let merged = global.merge(&local);
 
-        // 本地如果没有显式覆盖，就应该保留全局已经生效的标量值。
         assert_eq!(merged.max_file_size, 2 * 1024 * 1024);
         assert_eq!(merged.search_limit, 20);
         assert_eq!(merged.cache_ttl_seconds, 7200);
-        assert_eq!(merged.language.as_deref(), Some("en"));
+        assert!(merged.copy_to_clipboard_on_pick);
     }
 }

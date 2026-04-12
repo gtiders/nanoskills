@@ -36,19 +36,22 @@ impl TestEnv {
     }
 
     pub(crate) fn global_config_dir(&self) -> PathBuf {
-        self.config_dir.join("nanoskills")
+        self.config_dir.join("skillscripts")
     }
 
     pub(crate) fn global_config_file(&self) -> PathBuf {
-        self.global_config_dir().join(".agent-skills.yaml")
+        self.global_config_dir().join("skillscripts.yaml")
     }
 
     pub(crate) fn command_envs(&self) -> Vec<(&'static str, &Path)> {
-        vec![("HOME", &self.home_dir)]
+        vec![
+            ("HOME", &self.home_dir),
+            ("USERPROFILE", &self.home_dir),
+        ]
     }
 
     pub(crate) fn command(&self, workspace: &Path) -> Command {
-        let mut cmd = Command::cargo_bin("nanoskills").expect("binary should build");
+        let mut cmd = Command::cargo_bin("skillscripts").expect("binary should build");
         let _ = self.cache_dir();
         let _ = self.global_config_dir();
         let _ = self.global_config_file();

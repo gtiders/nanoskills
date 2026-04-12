@@ -42,7 +42,7 @@ print("beta")
             "Duplicate tool_name 'duplicate_tool'",
         ));
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     let index_text = fs::read_to_string(index_path).expect("failed to read index");
     let index_json: serde_json::Value =
         serde_json::from_str(&index_text).expect("index should be valid JSON");
@@ -113,7 +113,7 @@ print("beta")
         "strict sync should exclude duplicate tool names from index: {stdout}"
     );
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     let index_text = fs::read_to_string(index_path).expect("failed to read index");
     let index_json: serde_json::Value =
         serde_json::from_str(&index_text).expect("index should be valid JSON");

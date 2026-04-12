@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use super::shared::load_index_or_report;
 
-/// Handle `nanoskills list`.
+/// Handle `skillscripts list`.
 pub(crate) fn run_list(engine: &SkillEngine, json: bool) -> Result<()> {
     let index = load_index_or_report(engine)?;
 

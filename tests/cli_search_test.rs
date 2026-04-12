@@ -58,9 +58,10 @@ print("image")
 
     assert_eq!(skills[0]["name"], "echo_skill");
     assert_eq!(skills[0]["description"], "Echo user input");
+    let expected_path = workspace.join("echo.py").to_string_lossy().replace('\\', "/");
     assert_eq!(
         skills[0]["path"],
-        serde_json::Value::String(workspace.join("echo.py").to_string_lossy().into_owned())
+        serde_json::Value::String(expected_path)
     );
     assert!(skills[0]["tags"].is_array());
     assert!(skills[0].get("parameters").is_none());

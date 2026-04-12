@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "nanoskills")]
+#[command(name = "skillscripts")]
 #[command(about = "为 AI Agent 构建极速本地技能库索引与检索 CLI")]
 #[command(version)]
 struct Cli {

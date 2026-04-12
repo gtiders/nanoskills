@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use super::shared::load_index_or_report;
 
-/// Handle `nanoskills search`.
+/// Handle `skillscripts search`.
 pub(crate) fn run_search(
     engine: &SkillEngine,
     query: &str,

@@ -1,10 +1,10 @@
-# nanoskills
+# skillscripts
 
 本地优先的 AI Agent 技能库索引与检索 CLI。
 
 ## 核心功能
 
-`nanoskills` 解决 Agent 导向技能系统的两个核心问题。
+`skillscripts`（别名 `sks`）解决 Agent 导向技能系统的两个核心问题。
 
 ### 1) Agent 工作流中的极速技能检索
 
@@ -34,7 +34,7 @@
 ## 安装
 
 从 release 安装：
-- https://github.com/gtiders/nanoskills/releases/latest
+- https://github.com/gtiders/skillscripts/releases/latest
 
 从源码安装：
 
@@ -45,20 +45,23 @@ cargo install --path .
 ## 快速上手
 
 ```bash
-nanoskills init
-nanoskills config
-nanoskills search image    # 首次运行自动构建索引
+skillscripts init
+skillscripts config
+skillscripts search image    # 首次运行自动构建索引
+# 或使用短别名
+sks init
+sks search image
 ```
 
 ## 核心命令
 
 | 命令 | 说明 |
 |---|---|
-| `init` | 在 `~/.config/nanoskills/.agent-skills.yaml` 创建全局配置。`--local` 创建项目级配置。 |
+| `init` | 在 `~/.config/skillscripts/skillscripts.yaml` 创建全局配置。`--local` 创建项目级配置。 |
 | `config` | 打印默认配置、本地配置和最终合并配置。 |
 | `sync` | 扫描并重建本地索引缓存。`--strict` 会在遇到格式错误的头部时报错退出。 |
 | `search <query>` | 对索引技能进行模糊搜索。始终输出 JSON：`[{name, tags, description, path}, …]` |
-| `list` | 列出所有已索引技能，输出 JSON。`nanoskills list --json` 输出紧凑格式。 |
+| `list` | 列出所有已索引技能，输出 JSON。`skillscripts list --json` 输出紧凑格式。 |
 | `pick` | 交互式 TUI 选择器，带预览。 |
 
 ### Search 和 List
@@ -85,10 +88,10 @@ nanoskills search image    # 首次运行自动构建索引
 - **首次运行** — 在首次查询前自动构建并缓存索引
 - **缓存过期** — 若距上次同步已超过 `cache_ttl_seconds`，查询前静默重建索引
 - **配置变更** — 若 `scan_paths`、`ignore_patterns` 或 `max_file_size` 与上次同步时不同，查询前静默重建索引
-- **手动同步** — `nanoskills sync` 始终触发重建并打印进度
+- **手动同步** — `skillscripts sync` 始终触发重建并打印进度
 
 ```
-$ nanoskills search image
+$ skillscripts search image
 [cache stale, refreshing…]
 [
   { "name": "image_resize", ... }
@@ -99,10 +102,10 @@ $ nanoskills search image
 
 配置文件：
 
-- **全局**：`~/.config/nanoskills/.agent-skills.yaml`
-- **本地**：`./.agent-skills.yaml`（项目级，与全局配置合并）
+- **全局**：`~/.config/skillscripts/skillscripts.yaml`
+- **本地**：`./skillscripts.yaml`（项目级，与全局配置合并）
 
-使用 `nanoskills config` 查看实际生效的运行时配置。
+使用 `skillscripts config` 查看实际生效的运行时配置。
 
 ### 最简配置
 

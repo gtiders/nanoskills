@@ -11,14 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- New `nanoskills config` command to print three config snapshots: default, current-directory local, and effective merged config.
-- New integration test coverage for config snapshot output (`cli_config_show_test`).
+- New `skillscripts config` command to print three config snapshots: default, current-directory local, and effective merged config.
+- New integration test coverage for config snapshot output (`cli_config_show`).
 
 ### Changed
 
 - Reworked bundled skills into standardized `SKILL.md` format under:
-  - `skills/nanoskills_builder/SKILL.md`
-  - `skills/nanoskills_usager/SKILL.md`
+  - `skills/skillscripts_builder/SKILL.md`
+  - `skills/skillscripts_usager/SKILL.md`
 - README and README_zh were rewritten and aligned to emphasize:
   - fast skill retrieval (`skill find`) for agent loops
   - deep agent/runtime JSON integration
@@ -27,7 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Release workflow packaging verification now checks current bundled skill paths (`skills/nanoskills_builder/SKILL.md`, `skills/nanoskills_usager/SKILL.md`) so tag-triggered releases pass asset validation.
+- Release workflow packaging verification now checks current bundled skill paths (`skills/skillscripts_builder/SKILL.md`, `skills/skillscripts_usager/SKILL.md`) so tag-triggered releases pass asset validation.
 
 ## [1.0.4] - 2026-03-24
 
@@ -62,7 +62,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `init` global seeding now copies skill files recursively from bundled/current `skills/`
-- Unified default config/cache paths to `~/.config/nanoskills` and `~/.cache/nanoskills`
+- Unified default config/cache paths to `~/.config/skillscripts` and `~/.cache/skillscripts`
 - README and README_zh restructured around product positioning, pain points, and runtime copy flow
 
 ### Added

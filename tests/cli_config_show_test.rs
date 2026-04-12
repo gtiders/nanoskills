@@ -25,7 +25,7 @@ search_limit: 9
     .expect("failed to write global config");
 
     fs::write(
-        workspace.join(".agent-skills.yaml"),
+        workspace.join("skillscripts.yaml"),
         r#"
 scan_paths:
   - ./local-skills
@@ -55,8 +55,12 @@ max_file_size: 2MB
         stdout.contains("local-skills"),
         "effective config should contain local scan path"
     );
+    let has_global_skills_path = stdout.contains("/.config/skillscripts/skills")
+        || stdout.contains("\\.config\\skillscripts\\skills")
+        || stdout.contains(".config/skillscripts/skills")
+        || stdout.contains(".config\\skillscripts\\skills");
     assert!(
-        stdout.contains("/.config/nanoskills/skills"),
+        has_global_skills_path,
         "effective config should contain injected global skills path"
     );
 }

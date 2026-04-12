@@ -96,7 +96,7 @@ fn cli_init_local_creates_config_in_current_directory() {
         .success()
         .stdout(predicate::str::contains("Created"));
 
-    let local_config = workspace.join(".agent-skills.yaml");
+    let local_config = workspace.join("skillscripts.yaml");
     assert!(
         local_config.exists(),
         "init --local should create a config file in the current directory"

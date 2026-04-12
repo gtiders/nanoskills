@@ -27,7 +27,7 @@ print("hello")
         .success()
         .stdout(predicate::str::contains("hello_skill"));
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     assert!(
         index_path.exists(),
         "list should auto-build index when cache is missing"
@@ -64,7 +64,7 @@ print("two")
     )
     .expect("failed to write second skill");
 
-    let index_path = env.cache_dir().join("nanoskills").join("index.json");
+    let index_path = env.cache_dir().join("skillscripts").join("index.json");
     let index_text = fs::read_to_string(&index_path).expect("failed to read index");
     let mut index_json: serde_json::Value =
         serde_json::from_str(&index_text).expect("index should be valid json");
@@ -101,7 +101,7 @@ print("echo")
     )
     .expect("failed to write skill file");
 
-    let cache_dir = env.cache_dir().join("nanoskills");
+    let cache_dir = env.cache_dir().join("skillscripts");
     fs::create_dir_all(&cache_dir).expect("failed to create cache dir");
     fs::write(cache_dir.join("index.json"), "{ invalid json").expect("failed to write bad index");
 
@@ -119,7 +119,7 @@ fn cli_default_command_recovers_from_corrupted_index_before_picker() {
     let workspace = env.root().join("workspace-default-command");
     fs::create_dir_all(&workspace).expect("failed to create workspace");
 
-    let cache_dir = env.cache_dir().join("nanoskills");
+    let cache_dir = env.cache_dir().join("skillscripts");
     fs::create_dir_all(&cache_dir).expect("failed to create cache dir");
     fs::write(cache_dir.join("index.json"), "not json").expect("failed to write bad index");
 

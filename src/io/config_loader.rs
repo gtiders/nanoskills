@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const CONFIG_FILE_NAME: &str = ".agent-skills.yaml";
+const CONFIG_FILE_NAME: &str = "skillscripts.yaml";
 const SKILLS_DIR_NAME: &str = "skills";
 
 pub(crate) enum InitScope {
@@ -19,7 +19,7 @@ pub(crate) struct ConfigSnapshot {
     pub(crate) effective_config: Config,
 }
 
-/// Resolves nanoskills configuration from global and local scopes.
+/// Resolves skillscripts configuration from global and local scopes.
 pub(crate) struct ConfigResolver {
     global_config_dir: PathBuf,
     local_config_dir: PathBuf,
@@ -74,7 +74,7 @@ impl ConfigResolver {
 
     /// Return the cache directory used for the generated index.
     pub(crate) fn get_cache_dir() -> PathBuf {
-        home_dir().join(".cache").join("nanoskills")
+        home_dir().join(".cache").join("skillscripts")
     }
 
     /// Ensure the cache directory exists before writing the index.
@@ -87,11 +87,14 @@ impl ConfigResolver {
 }
 
 fn global_config_dir() -> PathBuf {
-    home_dir().join(".config").join("nanoskills")
+    home_dir().join(".config").join("skillscripts")
 }
 
 fn home_dir() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
 }
 
 fn default_global_config() -> Config {
@@ -140,7 +143,7 @@ fn resolve_scan_path(base_dir: &Path, home: &Path, scan_path: &str) -> String {
     scan_path.to_string()
 }
 
-/// Return the global config directory under `~/.config/nanoskills`.
+/// Return the global config directory under `~/.config/skillscripts`.
 pub(crate) fn get_global_config_dir() -> PathBuf {
     global_config_dir()
 }
@@ -245,7 +248,7 @@ fn find_seed_skills_source() -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-/// Resolve nanoskills config relative to a local working directory.
+/// Resolve skillscripts config relative to a local working directory.
 pub(crate) fn resolve_config(local_dir: &Path) -> Result<Config> {
     ConfigResolver::new(local_dir).resolve()
 }
@@ -301,7 +304,6 @@ scan_paths:
 ignore_patterns:
   - dist
 max_file_size: 2MB
-language: zh-CN
 "#,
         )
         .expect("failed to write local config");
@@ -325,7 +327,7 @@ language: zh-CN
         assert_eq!(config.ignore_patterns, vec!["target", "dist"]);
         assert_eq!(config.search_limit, 8);
         assert_eq!(config.max_file_size, 2 * 1024 * 1024);
-        assert_eq!(config.language.as_deref(), Some("zh-CN"));
+        assert!(!config.copy_to_clipboard_on_pick);
     }
 
     #[test]
@@ -346,17 +348,24 @@ language: zh-CN
         let base = Path::new("/workspace/project");
         let home = Path::new("/home/demo");
 
+        fn to_expected(p: &Path) -> String {
+            p.to_string_lossy().replace('\\', "/")
+        }
+
         assert_eq!(
-            resolve_scan_path(base, home, "~/skills"),
+            to_expected(&Path::new(&resolve_scan_path(base, home, "~/skills"))),
             "/home/demo/skills"
         );
-        assert_eq!(resolve_scan_path(base, home, "~"), "/home/demo");
         assert_eq!(
-            resolve_scan_path(base, home, "relative/skills"),
+            to_expected(&Path::new(&resolve_scan_path(base, home, "~"))),
+            "/home/demo"
+        );
+        assert_eq!(
+            to_expected(&Path::new(&resolve_scan_path(base, home, "relative/skills"))),
             "/workspace/project/relative/skills"
         );
         assert_eq!(
-            resolve_scan_path(base, home, "/opt/shared-skills"),
+            to_expected(&Path::new(&resolve_scan_path(base, home, "/opt/shared-skills"))),
             "/opt/shared-skills"
         );
     }

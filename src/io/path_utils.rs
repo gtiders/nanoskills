@@ -43,7 +43,11 @@ mod tests {
     fn test_normalize_returns_absolute() {
         let path = Path::new(".");
         let result = normalize_path(path);
-        assert!(result.starts_with('/'));
+        let is_absolute_unix = result.starts_with('/');
+        let is_absolute_windows = result.len() > 2
+            && result.chars().nth(1) == Some(':')
+            && result.chars().nth(2) == Some('/');
+        assert!(is_absolute_unix || is_absolute_windows);
         assert!(!result.contains('\\'));
     }
 }
