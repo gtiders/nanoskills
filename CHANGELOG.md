@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-04
+
 ### Added
 
 - Added a read-only stdio MCP server with fuzzy `search_scripts` discovery and script resources.
