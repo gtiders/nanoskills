@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Added a read-only stdio MCP server with fuzzy `search_scripts` discovery and script resources.
+- Added optional script tags and shared skim-based search text for the picker and MCP.
+- Added installation of the portable `sks-script-authoring` Agent Skill during `sks init`.
+
+### Changed
+
+- Standardized registry paths as relative Unix-style paths on every platform using `typed-path`.
+- Made `sks init` idempotent and create the initially imported `scripts.yaml` without overwriting an existing script registry.
+- Ranked natural-language script searches by multiple relevance signals, treating tags as optional boosts and supporting a global `mcp.search_limit` default from 1 to 10.
+
+### Fixed
+
+- Replaced platform-specific PowerShell integration fixtures and reject Windows absolute paths consistently on Unix hosts.
+
 ## [1.0.10] - 2026-06-16
 
 ### Changed

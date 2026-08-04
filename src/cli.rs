@@ -1,3 +1,5 @@
+use crate::init::install_agent_skill;
+use crate::mcp;
 use crate::picker::run_skim_picker;
 use crate::registry::{display_path, global_config_dir, init_global_config, load_skills};
 use crate::run_command;
@@ -20,7 +22,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Create a configuration file")]
+    #[command(about = "Initialize the config and Agent Skill")]
     Init {
         #[arg(short = 'f', long, help = "Overwrite the existing configuration file")]
         force: bool,
@@ -29,6 +31,8 @@ enum Commands {
     List,
     #[command(about = "Interactive TUI selector with preview")]
     Pick,
+    #[command(about = "Run the local MCP server over stdio")]
+    Mcp,
 }
 
 pub(crate) fn run() -> Result<()> {
@@ -41,18 +45,32 @@ pub(crate) fn run() -> Result<()> {
         None | Some(Commands::Pick) => run_picker_command(),
         Some(Commands::Init { force }) => run_init(force),
         Some(Commands::List) => run_list(),
+        Some(Commands::Mcp) => mcp::run(),
     }
 }
 
 fn run_init(force: bool) -> Result<()> {
-    init_global_config(force)?;
-    println!("Created {}/sks.yaml", global_config_dir().display());
+    let config_path = global_config_dir()?.join("sks.yaml");
+    let config_changed = init_global_config(force)?;
+    let skill = install_agent_skill(force)?;
+    println!(
+        "{} {}",
+        if config_changed { "Created" } else { "Kept" },
+        config_path.display()
+    );
+    println!(
+        "{} {}",
+        if skill.changed { "Installed" } else { "Kept" },
+        skill.path.display()
+    );
     println!("This config supports only:");
     println!("- imports");
     println!("- scripts[].id");
     println!("- scripts[].path");
     println!("- scripts[].command");
     println!("- scripts[].comment");
+    println!("- scripts[].tags");
+    println!("- mcp.search_limit");
     Ok(())
 }
 

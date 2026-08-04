@@ -1,5 +1,5 @@
+use crate::portable_path;
 use anyhow::{Context, Result, bail};
-use path_clean::PathClean;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -10,6 +10,8 @@ use std::str::FromStr;
 
 const CONFIG_FILE_NAME: &str = "sks.yaml";
 pub(crate) const PATH_PLACEHOLDER: &str = "{{path}}";
+pub(crate) const DEFAULT_MCP_SEARCH_LIMIT: usize = 5;
+pub(crate) const MAX_MCP_SEARCH_LIMIT: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -31,10 +33,18 @@ impl FromStr for ScriptId {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct ConfigFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) mcp: Option<McpConfig>,
     #[serde(default)]
     pub(crate) imports: Vec<String>,
     #[serde(default)]
     pub(crate) scripts: Vec<ScriptRegistration>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct McpConfig {
+    #[serde(default = "default_mcp_search_limit")]
+    pub(crate) search_limit: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +54,8 @@ pub(crate) struct ScriptRegistration {
     pub(crate) command: String,
     #[serde(default)]
     pub(crate) comment: Option<String>,
+    #[serde(default)]
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,6 +66,8 @@ pub(crate) struct Skill {
     pub(crate) command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) comment: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,42 +76,58 @@ struct ConfigSource {
     config: ConfigFile,
 }
 
+pub(crate) struct LoadedRegistry {
+    pub(crate) skills: Vec<Skill>,
+    pub(crate) mcp_search_limit: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct PathResolver<'a> {
     base_dir: &'a Path,
 }
 
-pub(crate) fn global_config_dir() -> PathBuf {
-    home_dir().join(".config").join("sks")
+pub(crate) fn global_config_dir() -> Result<PathBuf> {
+    portable_path::config_dir()
 }
 
-pub(crate) fn global_config_path() -> PathBuf {
-    global_config_dir().join(CONFIG_FILE_NAME)
+pub(crate) fn global_config_path() -> Result<PathBuf> {
+    Ok(global_config_dir()?.join(CONFIG_FILE_NAME))
 }
 
-pub(crate) fn init_global_config(force: bool) -> Result<()> {
-    let config_dir = global_config_dir();
+pub(crate) fn init_global_config(force: bool) -> Result<bool> {
+    let config_dir = global_config_dir()?;
     fs::create_dir_all(&config_dir)
         .with_context(|| format!("failed to create directory {}", config_dir.display()))?;
 
     let config_path = config_dir.join(CONFIG_FILE_NAME);
-    if config_path.exists() && !force {
-        bail!(
-            "A configuration file already exists at {}\nUse --force to overwrite it.",
-            config_path.display()
-        );
+    let changed = !config_path.exists() || force;
+    if changed {
+        let content = serde_yaml::to_string(&default_global_config())
+            .context("failed to serialize default config")?;
+        fs::write(&config_path, content)
+            .with_context(|| format!("failed to write config {}", config_path.display()))?;
     }
 
-    let content = serde_yaml::to_string(&default_global_config())
-        .context("failed to serialize default config")?;
-    fs::write(&config_path, content)
-        .with_context(|| format!("failed to write config {}", config_path.display()))?;
+    let scripts_path = config_dir.join("scripts.yaml");
+    if !scripts_path.exists() {
+        fs::write(&scripts_path, "scripts: []\n")
+            .with_context(|| format!("failed to write config {}", scripts_path.display()))?;
+    }
 
-    Ok(())
+    Ok(changed)
 }
 
 pub(crate) fn load_skills() -> Result<Vec<Skill>> {
+    Ok(load_registry()?.skills)
+}
+
+pub(crate) fn load_registry() -> Result<LoadedRegistry> {
     let sources = load_config_sources()?;
+    let mcp_search_limit = sources[0]
+        .config
+        .mcp
+        .as_ref()
+        .map_or(DEFAULT_MCP_SEARCH_LIMIT, |mcp| mcp.search_limit);
     let mut skills = build_skills(&sources)?;
     skills.sort_by(|left, right| {
         left.id
@@ -105,7 +135,10 @@ pub(crate) fn load_skills() -> Result<Vec<Skill>> {
             .then_with(|| left.path.cmp(&right.path))
     });
     validate_unique_ids(&skills)?;
-    Ok(skills)
+    Ok(LoadedRegistry {
+        skills,
+        mcp_search_limit,
+    })
 }
 
 pub(crate) fn display_path(path: &Path) -> String {
@@ -113,8 +146,9 @@ pub(crate) fn display_path(path: &Path) -> String {
 }
 
 fn load_config_sources() -> Result<Vec<ConfigSource>> {
-    let global_path = global_config_path();
+    let global_path = global_config_path()?;
     let global = load_global_config_source(global_path)?;
+    validate_mcp_config(&global.config)?;
     let global_base_dir = parent_dir(&global.path)?;
     let imports = global.config.imports.clone();
     let resolver = PathResolver {
@@ -148,6 +182,12 @@ fn load_imported_config_source(path: PathBuf) -> Result<ConfigSource> {
     let config = load_config_file(&path)?;
     if !config.imports.is_empty() {
         bail!("Imported config {} cannot declare imports.", path.display());
+    }
+    if config.mcp.is_some() {
+        bail!(
+            "Imported config {} cannot declare mcp options.",
+            path.display()
+        );
     }
 
     Ok(ConfigSource { path, config })
@@ -208,6 +248,7 @@ fn build_skill(
         path,
         command: entry.command.clone(),
         comment: entry.comment.clone(),
+        tags: normalize_tags(entry.id, &entry.tags)?,
     })
 }
 
@@ -220,12 +261,7 @@ fn load_config_file(path: &Path) -> Result<ConfigFile> {
 
 impl PathResolver<'_> {
     fn resolve(self, value: &str, label: &str) -> Result<PathBuf> {
-        let candidate = Path::new(value);
-        if candidate.is_absolute() {
-            bail!("{label} must be relative: {}", candidate.display());
-        }
-
-        let joined = self.base_dir.join(candidate).clean();
+        let joined = portable_path::resolve_unix_relative(self.base_dir, value, label)?;
         if joined.exists() {
             return dunce::canonicalize(&joined)
                 .with_context(|| format!("failed to canonicalize {}", joined.display()));
@@ -233,6 +269,23 @@ impl PathResolver<'_> {
 
         Ok(joined)
     }
+}
+
+fn normalize_tags(id: ScriptId, tags: &[String]) -> Result<Vec<String>> {
+    let mut normalized = Vec::new();
+    for tag in tags {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            bail!("Registered script {id} contains an empty tag.");
+        }
+        if !normalized
+            .iter()
+            .any(|existing: &String| existing.eq_ignore_ascii_case(tag))
+        {
+            normalized.push(tag.to_string());
+        }
+    }
+    Ok(normalized)
 }
 
 fn validate_unique_ids(skills: &[Skill]) -> Result<()> {
@@ -250,6 +303,18 @@ fn validate_unique_ids(skills: &[Skill]) -> Result<()> {
     Ok(())
 }
 
+fn validate_mcp_config(config: &ConfigFile) -> Result<()> {
+    if let Some(mcp) = &config.mcp
+        && !(1..=MAX_MCP_SEARCH_LIMIT).contains(&mcp.search_limit)
+    {
+        bail!(
+            "mcp.search_limit must be between 1 and {MAX_MCP_SEARCH_LIMIT}, got {}.",
+            mcp.search_limit
+        );
+    }
+    Ok(())
+}
+
 fn parent_dir(path: &Path) -> Result<PathBuf> {
     path.parent()
         .map(Path::to_path_buf)
@@ -258,18 +323,16 @@ fn parent_dir(path: &Path) -> Result<PathBuf> {
 
 fn default_global_config() -> ConfigFile {
     ConfigFile {
+        mcp: Some(McpConfig {
+            search_limit: DEFAULT_MCP_SEARCH_LIMIT,
+        }),
         imports: vec!["scripts.yaml".to_string()],
         scripts: Vec::new(),
     }
 }
 
-fn home_dir() -> PathBuf {
-    std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map_or_else(
-            |_| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")),
-            PathBuf::from,
-        )
+const fn default_mcp_search_limit() -> usize {
+    DEFAULT_MCP_SEARCH_LIMIT
 }
 
 fn serialize_path<S>(path: &Path, serializer: S) -> Result<S::Ok, S::Error>

@@ -40,6 +40,18 @@ impl TestEnv {
         self.global_config_dir().join("sks.yaml")
     }
 
+    fn imported_scripts_file(&self) -> PathBuf {
+        self.global_config_dir().join("scripts.yaml")
+    }
+
+    fn installed_skill_file(&self) -> PathBuf {
+        self.home
+            .join(".agents")
+            .join("skills")
+            .join("sks-script-authoring")
+            .join("SKILL.md")
+    }
+
     fn write_global_config(&self, content: &str) {
         fs::create_dir_all(self.global_config_dir()).expect("failed to create global config dir");
         fs::write(self.global_config_file(), content).expect("failed to write global config");
@@ -75,11 +87,20 @@ fn init_creates_global_config() {
         serde_yaml::from_str(&yaml).expect("generated config should be valid YAML");
 
     assert_eq!(config["imports"][0].as_str(), Some("scripts.yaml"));
+    assert_eq!(config["mcp"]["search_limit"].as_i64(), Some(5));
     assert!(config["scripts"].is_sequence());
+    assert_eq!(
+        fs::read_to_string(env.imported_scripts_file()).unwrap(),
+        "scripts: []\n"
+    );
+    let skill = fs::read_to_string(env.installed_skill_file()).expect("skill should be installed");
+    assert!(skill.contains("name: sks-script-authoring"));
+    assert!(skill.contains("sks run <id> [args...]"));
+    env.command(&workspace).arg("list").assert().success();
 }
 
 #[test]
-fn init_rejects_existing_config_without_force() {
+fn init_keeps_existing_config_and_installs_missing_skill() {
     let env = TestEnv::new();
     let workspace = env.root().join("workspace-init-exists");
     fs::create_dir_all(&workspace).expect("failed to create workspace");
@@ -88,10 +109,14 @@ fn init_rejects_existing_config_without_force() {
     env.command(&workspace)
         .arg("init")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "A configuration file already exists",
-        ));
+        .success()
+        .stdout(predicate::str::contains("Kept"))
+        .stdout(predicate::str::contains("Installed"));
+    assert_eq!(
+        fs::read_to_string(env.global_config_file()).unwrap(),
+        "scripts: []\n"
+    );
+    assert!(env.installed_skill_file().is_file());
 }
 
 #[test]
@@ -112,6 +137,42 @@ fn init_force_overwrites_existing_config() {
         serde_yaml::from_str(&yaml).expect("overwritten config should be valid YAML");
 
     assert_eq!(config["imports"][0].as_str(), Some("scripts.yaml"));
+}
+
+#[test]
+fn init_force_does_not_overwrite_the_script_registry() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-init-force-registry");
+    fs::create_dir_all(&workspace).expect("failed to create workspace");
+    env.command(&workspace).arg("init").assert().success();
+    fs::write(env.imported_scripts_file(), "scripts:\n  # keep me\n").unwrap();
+
+    env.command(&workspace)
+        .args(["init", "--force"])
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(env.imported_scripts_file()).unwrap(),
+        "scripts:\n  # keep me\n"
+    );
+}
+
+#[test]
+fn init_uses_userprofile_dot_directories_when_home_is_unset() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-init-userprofile");
+    fs::create_dir_all(&workspace).expect("failed to create workspace");
+
+    env.command(&workspace)
+        .env_remove("HOME")
+        .arg("init")
+        .assert()
+        .success();
+
+    assert!(env.global_config_file().is_file());
+    assert!(env.installed_skill_file().is_file());
+    assert!(!env.home.join("AppData").exists());
 }
 
 #[test]
@@ -189,6 +250,72 @@ scripts:
         skills[0]["comment"].as_str(),
         Some("Run the commented test script")
     );
+}
+
+#[test]
+fn list_normalizes_optional_tags_without_breaking_old_entries() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-list-tags");
+    let scripts_dir = env.global_config_dir().join("scripts");
+    fs::create_dir_all(&workspace).expect("failed to create workspace");
+    fs::create_dir_all(&scripts_dir).expect("failed to create scripts dir");
+    fs::write(scripts_dir.join("tagged.py"), "print('tagged')\n").unwrap();
+    fs::write(scripts_dir.join("legacy.py"), "print('legacy')\n").unwrap();
+    env.write_global_config(
+        r"
+scripts:
+  - id: 110
+    path: scripts/tagged.py
+    command: python {{path}}
+    tags: [' PDF ', document, pdf]
+  - id: 111
+    path: scripts/legacy.py
+    command: python {{path}}
+",
+    );
+
+    let assert = env.command(&workspace).arg("list").assert().success();
+    let skills: Vec<serde_yaml::Value> =
+        serde_yaml::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(skills[0]["tags"][0].as_str(), Some("PDF"));
+    assert_eq!(skills[0]["tags"][1].as_str(), Some("document"));
+    assert_eq!(skills[0]["tags"].as_sequence().unwrap().len(), 2);
+    assert!(skills[1].get("tags").is_none());
+}
+
+#[test]
+fn list_validates_the_global_mcp_search_limit() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-invalid-search-limit");
+    fs::create_dir_all(&workspace).unwrap();
+    env.write_global_config("mcp:\n  search_limit: 11\nscripts: []\n");
+
+    env.command(&workspace)
+        .arg("list")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "mcp.search_limit must be between 1 and 10",
+        ));
+}
+
+#[test]
+fn imported_configs_cannot_override_global_mcp_options() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-imported-mcp");
+    fs::create_dir_all(&workspace).unwrap();
+    env.write_global_config("imports: [scripts.yaml]\n");
+    fs::write(
+        env.imported_scripts_file(),
+        "mcp:\n  search_limit: 2\nscripts: []\n",
+    )
+    .unwrap();
+
+    env.command(&workspace)
+        .arg("list")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot declare mcp options"));
 }
 
 #[test]
@@ -395,7 +522,9 @@ imports:
         .arg("list")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("import must be relative"));
+        .stderr(predicate::str::contains(
+            "import must be a relative Unix-style path",
+        ));
 }
 
 #[test]
@@ -472,37 +601,35 @@ fn run_replaces_path_placeholder_and_appends_extra_args() {
     fs::create_dir_all(&workspace).expect("failed to create workspace");
     fs::create_dir_all(&scripts_dir).expect("failed to create scripts dir");
 
-    fs::write(
-        scripts_dir.join("echo_args.ps1"),
-        r#"
-param(
-    [string]$PathArg,
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Rest
-)
-Write-Output "PATH=$PathArg"
-foreach ($item in $Rest) {
-    Write-Output "ARG=$item"
-}
-"#,
-    )
-    .expect("failed to write script");
+    #[cfg(unix)]
+    let (script_name, script_body, command) = (
+        "echo_args.sh",
+        "printf 'PATH=%s\\n' \"$1\"\nshift\nfor arg in \"$@\"; do printf 'ARG=%s\\n' \"$arg\"; done\n",
+        "sh {{path}} \"{{path}}\"",
+    );
+    #[cfg(windows)]
+    let (script_name, script_body, command) = (
+        "echo_args.cmd",
+        "@echo off\necho PATH=%1\nshift\n:loop\nif \"%1\"==\"\" goto end\necho ARG=%1\nshift\ngoto loop\n:end\n",
+        "cmd /C {{path}} \"{{path}}\"",
+    );
+    fs::write(scripts_dir.join(script_name), script_body).expect("failed to write script");
 
-    env.write_global_config(
+    env.write_global_config(&format!(
         r#"
 scripts:
   - id: 501
-    path: scripts/echo_args.ps1
-    command: powershell -NoProfile -ExecutionPolicy Bypass -File {{path}} "{{path}}"
+    path: scripts/{script_name}
+    command: {command}
 "#,
-    );
+    ));
 
     env.command(&workspace)
         .args(["run", "501", "one", "--flag", "three"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Running: powershell"))
-        .stdout(predicate::str::contains("echo_args.ps1"))
+        .stdout(predicate::str::contains("Running:"))
+        .stdout(predicate::str::contains(script_name))
         .stdout(predicate::str::contains("ARG=one"))
         .stdout(predicate::str::contains("ARG=--flag"))
         .stdout(predicate::str::contains("ARG=three"));
@@ -516,23 +643,28 @@ fn run_preserves_unquoted_placeholder_path_with_spaces() {
     fs::create_dir_all(&workspace).expect("failed to create workspace");
     fs::create_dir_all(&scripts_dir).expect("failed to create scripts dir");
 
-    fs::write(
-        scripts_dir.join("echo path.ps1"),
-        r#"
-param([string]$PathArg)
-Write-Output "PATH=$PathArg"
-"#,
-    )
-    .expect("failed to write script");
+    #[cfg(unix)]
+    let (script_name, script_body, command) = (
+        "echo path.sh",
+        "printf 'PATH=%s\\n' \"$1\"\n",
+        "sh {{path}} {{path}}",
+    );
+    #[cfg(windows)]
+    let (script_name, script_body, command) = (
+        "echo path.cmd",
+        "@echo off\necho PATH=%1\n",
+        "cmd /C {{path}} {{path}}",
+    );
+    fs::write(scripts_dir.join(script_name), script_body).expect("failed to write script");
 
-    env.write_global_config(
+    env.write_global_config(&format!(
         r"
 scripts:
   - id: 503
-    path: scripts with spaces/echo path.ps1
-    command: powershell -NoProfile -ExecutionPolicy Bypass -File {{path}} {{path}}
+    path: scripts with spaces/{script_name}
+    command: {command}
 ",
-    );
+    ));
 
     env.command(&workspace)
         .args(["run", "503"])
@@ -540,7 +672,7 @@ scripts:
         .success()
         .stdout(predicate::str::contains("scripts with spaces"))
         .stdout(predicate::str::contains("PATH="))
-        .stdout(predicate::str::contains("echo path.ps1"));
+        .stdout(predicate::str::contains(script_name));
 }
 
 #[test]
@@ -594,4 +726,93 @@ fn run_reports_usage_without_id() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Usage: sks run <id> [args...]"));
+}
+
+#[test]
+fn mcp_exposes_search_instructions_results_and_source_resources() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-mcp");
+    let scripts_dir = env.global_config_dir().join("scripts");
+    fs::create_dir_all(&workspace).expect("failed to create workspace");
+    fs::create_dir_all(&scripts_dir).expect("failed to create scripts dir");
+    fs::write(scripts_dir.join("markdown_pdf.py"), "print('pdf source')\n").unwrap();
+    env.write_global_config(
+        r"
+scripts:
+  - id: 701
+    path: scripts/markdown_pdf.py
+    command: python {{path}}
+    comment: Convert Markdown documents to PDF
+    tags: [markdown, pdf]
+",
+    );
+    let requests = concat!(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}}\n",
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"search_scripts\",\"arguments\":{\"query\":\"markdown pdf\"}}}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"search_scripts\",\"arguments\":{\"query\":\"nonexistent xyz\"}}}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"resources/read\",\"params\":{\"uri\":\"sks://scripts/701/source\"}}\n"
+    );
+
+    env.command(&workspace)
+        .arg("mcp")
+        .write_stdin(requests)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("existing local automation"))
+        .stdout(predicate::str::contains("search_scripts"))
+        .stdout(predicate::str::contains("sks run 701 [args...]"))
+        .stdout(predicate::str::contains(
+            "No matching registered scripts found",
+        ))
+        .stdout(predicate::str::contains("pdf source"));
+}
+
+#[test]
+fn mcp_uses_the_global_search_limit_when_the_request_omits_limit() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-mcp-global-limit");
+    let scripts_dir = env.global_config_dir().join("scripts");
+    fs::create_dir_all(&workspace).unwrap();
+    fs::create_dir_all(&scripts_dir).unwrap();
+    for id in 1..=4 {
+        fs::write(scripts_dir.join(format!("pdf-{id}.py")), "print('pdf')\n").unwrap();
+    }
+    env.write_global_config(
+        r"
+mcp:
+  search_limit: 2
+scripts:
+  - { id: 1, path: scripts/pdf-1.py, command: 'python {{path}}', comment: Create PDF }
+  - { id: 2, path: scripts/pdf-2.py, command: 'python {{path}}', comment: Create PDF }
+  - { id: 3, path: scripts/pdf-3.py, command: 'python {{path}}', comment: Create PDF }
+  - { id: 4, path: scripts/pdf-4.py, command: 'python {{path}}', comment: Create PDF }
+",
+    );
+    let requests = concat!(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}}\n",
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"search_scripts\",\"arguments\":{\"query\":\"pdf\"}}}\n"
+    );
+
+    let assert = env
+        .command(&workspace)
+        .arg("mcp")
+        .write_stdin(requests)
+        .assert()
+        .success();
+    let output = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let response = output
+        .lines()
+        .filter_map(|line| serde_yaml::from_str::<serde_yaml::Value>(line).ok())
+        .find(|value| value["id"].as_i64() == Some(2))
+        .expect("tool response should be present");
+    assert_eq!(
+        response["result"]["structuredContent"]["matches"]
+            .as_sequence()
+            .unwrap()
+            .len(),
+        2
+    );
 }

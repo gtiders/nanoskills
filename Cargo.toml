@@ -18,12 +18,14 @@ anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 dirs = "6.0.0"
 dunce = "1.0.5"
-path-clean = "1.0.1"
 ratatui = "0.30.2"
+rmcp = { version = "3.1.0", features = ["transport-io"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 skim = "4.8.0"
 syntect = { version = "5.3.0", default-features = false, features = ["default-fancy"] }
+tokio = { version = "1.49.0", features = ["io-std", "macros", "rt-multi-thread"] }
+typed-path = "0.12.3"
 
 [dev-dependencies]
 assert_cmd = "2.2.2"

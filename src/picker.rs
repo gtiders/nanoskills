@@ -1,4 +1,5 @@
 use crate::registry::{Skill, display_path};
+use crate::search::script_search_text;
 use anyhow::{Result, anyhow};
 use ratatui::text::Line;
 use skim::prelude::*;
@@ -80,10 +81,8 @@ struct PickerItem {
 
 impl PickerItem {
     fn new(skill: Skill) -> Self {
-        let path = display_path(&skill.path);
-        let comment = skill.comment.as_deref().unwrap_or_default();
         Self {
-            search_text: format!("{} {} {} {}", skill.id, path, skill.command, comment),
+            search_text: script_search_text(&skill),
             skill,
         }
     }
@@ -228,6 +227,7 @@ mod tests {
             path: PathBuf::from("scripts/example.py"),
             command: "python {{path}}".to_string(),
             comment: Some("example script".to_string()),
+            tags: vec!["example".to_string()],
         };
 
         let preview = render_preview(&skill, b"print('ok')\n");
@@ -250,6 +250,7 @@ mod tests {
             path: PathBuf::from("scripts/no_newline.py"),
             command: "python {{path}}".to_string(),
             comment: None,
+            tags: Vec::new(),
         };
 
         let preview = render_preview(&skill, b"first\nsecond\nfinal line");
