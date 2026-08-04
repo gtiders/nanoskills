@@ -44,11 +44,11 @@ impl TestEnv {
         self.global_config_dir().join("scripts.yaml")
     }
 
-    fn installed_skill_file(&self) -> PathBuf {
+    fn installed_skill_file(&self, name: &str) -> PathBuf {
         self.home
             .join(".agents")
             .join("skills")
-            .join("sks-script-authoring")
+            .join(name)
             .join("SKILL.md")
     }
 
@@ -93,9 +93,14 @@ fn init_creates_global_config() {
         fs::read_to_string(env.imported_scripts_file()).unwrap(),
         "scripts: []\n"
     );
-    let skill = fs::read_to_string(env.installed_skill_file()).expect("skill should be installed");
-    assert!(skill.contains("name: sks-script-authoring"));
-    assert!(skill.contains("sks run <id> [args...]"));
+    let authoring_skill = fs::read_to_string(env.installed_skill_file("sks-script-authoring"))
+        .expect("authoring skill should be installed");
+    assert!(authoring_skill.contains("name: sks-script-authoring"));
+    assert!(authoring_skill.contains("sks run <id> [args...]"));
+    let discovery_skill = fs::read_to_string(env.installed_skill_file("sks-script-discovery"))
+        .expect("discovery skill should be installed");
+    assert!(discovery_skill.contains("name: sks-script-discovery"));
+    assert!(discovery_skill.contains("every request to use a script"));
     env.command(&workspace).arg("list").assert().success();
 }
 
@@ -116,7 +121,8 @@ fn init_keeps_existing_config_and_installs_missing_skill() {
         fs::read_to_string(env.global_config_file()).unwrap(),
         "scripts: []\n"
     );
-    assert!(env.installed_skill_file().is_file());
+    assert!(env.installed_skill_file("sks-script-authoring").is_file());
+    assert!(env.installed_skill_file("sks-script-discovery").is_file());
 }
 
 #[test]
@@ -171,7 +177,8 @@ fn init_uses_userprofile_dot_directories_when_home_is_unset() {
         .success();
 
     assert!(env.global_config_file().is_file());
-    assert!(env.installed_skill_file().is_file());
+    assert!(env.installed_skill_file("sks-script-authoring").is_file());
+    assert!(env.installed_skill_file("sks-script-discovery").is_file());
     assert!(!env.home.join("AppData").exists());
 }
 
@@ -760,7 +767,11 @@ scripts:
         .write_stdin(requests)
         .assert()
         .success()
-        .stdout(predicate::str::contains("existing local automation"))
+        .stdout(predicate::str::contains("before writing"))
+        .stdout(predicate::str::contains(
+            "request to use a script is always an explicit search trigger",
+        ))
+        .stdout(predicate::str::contains("readOnlyHint"))
         .stdout(predicate::str::contains("search_scripts"))
         .stdout(predicate::str::contains("sks run 701 [args...]"))
         .stdout(predicate::str::contains(

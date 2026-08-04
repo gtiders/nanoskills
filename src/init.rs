@@ -3,16 +3,37 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 
-const SKILL_NAME: &str = "sks-script-authoring";
-const SKILL_CONTENT: &str = include_str!("../assets/skills/sks-script-authoring/SKILL.md");
+const BUILTIN_SKILLS: &[(&str, &str)] = &[
+    (
+        "sks-script-discovery",
+        include_str!("../assets/skills/sks-script-discovery/SKILL.md"),
+    ),
+    (
+        "sks-script-authoring",
+        include_str!("../assets/skills/sks-script-authoring/SKILL.md"),
+    ),
+];
 
 pub(crate) struct SkillInstall {
     pub(crate) path: PathBuf,
     pub(crate) changed: bool,
 }
 
-pub(crate) fn install_agent_skill(force: bool) -> Result<SkillInstall> {
-    let directory = agent_skills_dir()?.join(SKILL_NAME);
+pub(crate) fn install_agent_skills(force: bool) -> Result<Vec<SkillInstall>> {
+    let skills_directory = agent_skills_dir()?;
+    BUILTIN_SKILLS
+        .iter()
+        .map(|(name, content)| install_agent_skill(&skills_directory, name, content, force))
+        .collect()
+}
+
+fn install_agent_skill(
+    skills_directory: &std::path::Path,
+    name: &str,
+    content: &str,
+    force: bool,
+) -> Result<SkillInstall> {
+    let directory = skills_directory.join(name);
     let path = directory.join("SKILL.md");
     if path.exists() && !force {
         return Ok(SkillInstall {
@@ -23,7 +44,7 @@ pub(crate) fn install_agent_skill(force: bool) -> Result<SkillInstall> {
 
     fs::create_dir_all(&directory)
         .with_context(|| format!("failed to create directory {}", directory.display()))?;
-    fs::write(&path, SKILL_CONTENT)
+    fs::write(&path, content)
         .with_context(|| format!("failed to write skill {}", path.display()))?;
     Ok(SkillInstall {
         path,

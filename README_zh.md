@@ -64,7 +64,7 @@ sks run 1 foo --bar baz
 sks mcp
 ```
 
-- `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-authoring` Agent Skill
+- `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-discovery` 与 `sks-script-authoring` Agent Skills
 - `list` 以 YAML 输出所有已注册脚本
 - `pick` 打开交互式选择器，并显示表格化列表与语法高亮预览
 - `run <id> [args...]` 替换 `command` 中的 `{{path}}`，并把剩余参数全部追加到命令尾部
@@ -83,9 +83,11 @@ sks mcp
 
 这个 MCP 是只读的。它只暴露一个由模型调用的 `search_scripts` 工具，以及注册表、脚本元数据和源码 resources。搜索复用 picker 的 skim 模糊匹配器，以自然语言 query 负责召回；可选 tags 只是排序加权信号，不再作为必需过滤条件。主配置中的 `mcp.search_limit` 可以把默认结果数量设置为 1–10，默认值是 5；单次工具调用仍可用 `limit` 临时覆盖。imported 配置不能声明 MCP 选项。每次请求都会重新读取注册表，因此修改 YAML 后无需重启 server，下一次搜索即可看到变化。
 
+MCP 指令采用“先搜索、后新写”的触发策略：当任务可以通过脚本执行时，模型应在编写临时代码或 shell 命令前搜索一次，即使用户没有提到 sks、本地脚本或已有工具。计算、格式转换、文件与数据处理、内容生成、校验和构建流程都会触发；纯概念讨论则不触发。任何明确要求“使用脚本”的请求都必须先搜索，不因任务看起来简单或临时编写代码更快而跳过。工具同时声明为只读、幂等且不访问外部世界，以降低模型对试探性调用的风险判断。
+
 找到脚本后，结果会提供 `sks run <id> [args...]` 和资源 URI；参数不清楚时，模型可以按需读取源码。没有匹配项是正常的成功结果，不会阻止模型换用其他方式继续工作。
 
-`sks init` 安装的 Agent Skill 会指导兼容的编码代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。
+`sks init` 安装两个互补的 Agent Skills：`sks-script-discovery` 让兼容代理在一次性编程前主动发现并复用已有脚本，`sks-script-authoring` 指导代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。最终是否调用工具仍由 MCP 客户端和模型决定；服务器说明与 Skill 会显著增强触发倾向，但不能从协议层强制调用。
 
 ## Picker
 

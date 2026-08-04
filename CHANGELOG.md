@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-04
+
+### Added
+
+- Added an installable `sks-script-discovery` Agent Skill for search-before-authoring behavior.
+
+### Changed
+
+- Broadened MCP discovery triggers to executable tasks and explicit script requests, with generalized search-before-authoring guidance and low-risk tool annotations.
+
 ## [1.1.0] - 2026-08-04
 
 ### Added

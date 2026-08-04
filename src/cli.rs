@@ -1,4 +1,4 @@
-use crate::init::install_agent_skill;
+use crate::init::install_agent_skills;
 use crate::mcp;
 use crate::picker::run_skim_picker;
 use crate::registry::{display_path, global_config_dir, init_global_config, load_skills};
@@ -22,7 +22,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Initialize the config and Agent Skill")]
+    #[command(about = "Initialize the config and Agent Skills")]
     Init {
         #[arg(short = 'f', long, help = "Overwrite the existing configuration file")]
         force: bool,
@@ -52,17 +52,19 @@ pub(crate) fn run() -> Result<()> {
 fn run_init(force: bool) -> Result<()> {
     let config_path = global_config_dir()?.join("sks.yaml");
     let config_changed = init_global_config(force)?;
-    let skill = install_agent_skill(force)?;
+    let skills = install_agent_skills(force)?;
     println!(
         "{} {}",
         if config_changed { "Created" } else { "Kept" },
         config_path.display()
     );
-    println!(
-        "{} {}",
-        if skill.changed { "Installed" } else { "Kept" },
-        skill.path.display()
-    );
+    for skill in skills {
+        println!(
+            "{} {}",
+            if skill.changed { "Installed" } else { "Kept" },
+            skill.path.display()
+        );
+    }
     println!("This config supports only:");
     println!("- imports");
     println!("- scripts[].id");

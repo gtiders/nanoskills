@@ -13,7 +13,7 @@ use rmcp::{
 use serde::Serialize;
 use std::fs;
 
-const INSTRUCTIONS: &str = "This server indexes locally registered scripts. When a user request may be solved by existing local automation, call search_scripts with a concise capability query or relevant tags. If matches are returned, select by description and tags, read the source resource when arguments or behavior are unclear, and use `sks run <id> [args...]` only when shell execution is available and appropriate. Do not invent unsupported arguments. An empty result is normal; continue without repeatedly retrying equivalent searches.";
+const INSTRUCTIONS: &str = "This server discovers reusable scripts registered on the user's machine. Search before writing, generating, or executing ad-hoc code or shell commands for any concrete task that could be automated, even when the user does not mention sks, local tools, or existing scripts. This includes calculations, conversions, file and data processing, content generation, validation, and build or development workflows. A request to use a script is always an explicit search trigger. Call search_scripts once with the task's capability and domain terms. Do not search for purely conceptual discussion that needs no execution. If matches are returned, select by description and tags, read the source resource when arguments or behavior are unclear, and use `sks run <id> [args...]` only when shell execution is available and appropriate. Do not invent unsupported arguments. An empty result is normal; continue with another approach without repeatedly retrying equivalent searches.";
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchScriptsRequest {
@@ -61,7 +61,14 @@ impl SksServer {
 impl SksServer {
     #[tool(
         name = "search_scripts",
-        description = "Search and rank the most relevant locally registered scripts that may help complete the user's task. Query text is sufficient; optional tags only improve ranking. An empty result is normal and should not block the task."
+        description = "Search and rank reusable scripts registered on the user's machine. Call this once BEFORE writing or running new ad-hoc code or shell commands for an executable task, including calculations, conversions, file/data processing, generation, validation, and build workflows. Do this even if the user did not ask for an existing or local tool; an explicit request to use a script must trigger a search. Query text alone is sufficient and optional tags only improve ranking. If nothing useful matches, continue normally without retrying the same search.",
+        annotations(
+            title = "Search registered scripts",
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
     fn search_scripts(
         &self,

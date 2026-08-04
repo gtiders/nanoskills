@@ -64,7 +64,7 @@ sks run 1 foo --bar baz
 sks mcp
 ```
 
-- `init` creates `~/.config/sks/sks.yaml`, an empty imported `scripts.yaml`, and the `sks-script-authoring` Agent Skill under `~/.agents/skills`
+- `init` creates `~/.config/sks/sks.yaml`, an empty imported `scripts.yaml`, and the `sks-script-discovery` and `sks-script-authoring` Agent Skills under `~/.agents/skills`
 - `list` outputs all registered scripts as YAML
 - `pick` opens the interactive picker with a table-style list and syntax-highlighted file preview
 - `run <id> [args...]` replaces `{{path}}` in `command` and appends all remaining args
@@ -83,9 +83,11 @@ Configure an MCP client to launch:
 
 The server is read-only. It exposes one model-controlled tool, `search_scripts`, plus resources for the registry, script metadata, and source code. Search uses the same skim fuzzy matcher as the picker. Natural-language query terms drive recall; optional tags are soft ranking hints rather than required filters. `mcp.search_limit` in the global config controls the default number of results from 1 to 10; it defaults to 5, and a tool call can temporarily override it with `limit`. Imported configs cannot declare MCP options. Every request reloads the registry, so YAML changes are visible on the next search without restarting the server.
 
+The MCP instructions use a search-before-authoring policy: for executable tasks, the model should search once before writing ad-hoc code or shell commands even when the user does not mention sks, local scripts, or existing tools. Calculations, conversions, file and data processing, generation, validation, and build workflows are triggers; purely conceptual discussion is not. Every explicit request to use a script must trigger discovery, regardless of whether the task appears simple or writing new code seems faster. The tool is also annotated as read-only, idempotent, and closed-world so clients can treat exploratory searches as low risk.
+
 When a match is found, the result includes `sks run <id> [args...]` and resource URIs. The model can inspect source when arguments are unclear. An empty search result is a normal success and does not block the model from continuing another way.
 
-`sks init` also installs a concise Agent Skill that teaches compatible coding agents how to author, register, validate, and test new scripts. Existing config and skill files are preserved unless `--force` is supplied.
+`sks init` installs two complementary Agent Skills. `sks-script-discovery` tells compatible agents to discover and reuse registered scripts before one-off programming, while `sks-script-authoring` teaches them to author, register, validate, and test new scripts. Existing config and skill files are preserved unless `--force` is supplied. The final tool decision still belongs to the MCP client and model: server instructions and Skills improve invocation behavior but cannot force it at the protocol level.
 
 ## Picker
 
