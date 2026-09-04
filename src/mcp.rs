@@ -1,4 +1,4 @@
-use crate::registry::{MAX_MCP_SEARCH_LIMIT, ScriptId, Skill, load_registry, load_skills};
+use crate::registry::{MAX_MCP_SEARCH_LIMIT, ScriptName, Skill, load_registry, load_skills};
 use crate::search::{script_name, search_skills};
 use rmcp::{
     ErrorData, Json, ServerHandler, ServiceExt,
@@ -13,7 +13,7 @@ use rmcp::{
 use serde::Serialize;
 use std::fs;
 
-const INSTRUCTIONS: &str = "This server discovers reusable scripts registered on the user's machine. Search before writing, generating, or executing ad-hoc code or shell commands for any concrete task that could be automated, even when the user does not mention sks, local tools, or existing scripts. This includes calculations, conversions, file and data processing, content generation, validation, and build or development workflows. A request to use a script is always an explicit search trigger. Call search_scripts once with the task's capability and domain terms. Do not search for purely conceptual discussion that needs no execution. If matches are returned, select by description and tags, read the source resource when arguments or behavior are unclear, and use `sks run <id> [args...]` only when shell execution is available and appropriate. Do not invent unsupported arguments. An empty result is normal; continue with another approach without repeatedly retrying equivalent searches.";
+const INSTRUCTIONS: &str = "This server discovers reusable scripts registered on the user's machine. Search before writing, generating, or executing ad-hoc code or shell commands for any concrete task that could be automated, even when the user does not mention sks, local tools, or existing scripts. This includes calculations, conversions, file and data processing, content generation, validation, and build or development workflows. A request to use a script is always an explicit search trigger. Call search_scripts once with the task's capability and domain terms. Do not search for purely conceptual discussion that needs no execution. If matches are returned, select by description and tags, read the source resource when arguments or behavior are unclear, and use `sks run <name> [args...]` only when shell execution is available and appropriate. Do not invent unsupported arguments. An empty result is normal; continue with another approach without repeatedly retrying equivalent searches.";
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchScriptsRequest {
@@ -34,7 +34,6 @@ pub(crate) struct SearchScriptsResponse {
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 struct ScriptMatch {
-    id: u32,
     name: String,
     description: Option<String>,
     tags: Vec<String>,
@@ -146,7 +145,7 @@ impl ServerHandler for SksServer {
         ];
         for skill in &skills {
             resources.push(
-                Resource::new(details_uri(skill.id), format!("script-{}", skill.id))
+                Resource::new(details_uri(&skill.name), format!("script-{}", skill.name))
                     .with_title(script_name(skill))
                     .with_description(
                         skill
@@ -157,10 +156,13 @@ impl ServerHandler for SksServer {
                     .with_mime_type("application/yaml"),
             );
             resources.push(
-                Resource::new(source_uri(skill.id), format!("script-{}-source", skill.id))
-                    .with_title(format!("{} source", script_name(skill)))
-                    .with_description("Source code for the registered script")
-                    .with_mime_type(source_mime(skill)),
+                Resource::new(
+                    source_uri(&skill.name),
+                    format!("script-{}-source", skill.name),
+                )
+                .with_title(format!("{} source", script_name(skill)))
+                .with_description("Source code for the registered script")
+                .with_mime_type(source_mime(skill)),
             );
         }
         Ok(ListResourcesResult::with_all_items(resources))
@@ -180,10 +182,10 @@ impl ServerHandler for SksServer {
                 uri,
             )
             .with_mime_type("application/yaml")
-        } else if let Some((id, source)) = parse_script_uri(uri) {
+        } else if let Some((name, source)) = parse_script_uri(uri) {
             let skill = skills
                 .iter()
-                .find(|skill| skill.id == id)
+                .find(|skill| skill.name == name)
                 .ok_or_else(|| ErrorData::invalid_params("unknown script resource", None))?;
             if source {
                 ResourceContents::text(
@@ -216,32 +218,31 @@ pub(crate) fn run() -> anyhow::Result<()> {
 
 fn script_match(skill: &Skill) -> ScriptMatch {
     ScriptMatch {
-        id: skill.id.0,
-        name: script_name(skill),
+        name: skill.name.to_string(),
         description: skill.comment.clone(),
         tags: skill.tags.clone(),
-        usage: format!("sks run {} [args...]", skill.id),
+        usage: format!("sks run {} [args...]", skill.name),
         command_template: skill.command.clone(),
-        details_uri: details_uri(skill.id),
-        source_uri: source_uri(skill.id),
+        details_uri: details_uri(&skill.name),
+        source_uri: source_uri(&skill.name),
     }
 }
 
-fn details_uri(id: ScriptId) -> String {
-    format!("sks://scripts/{id}")
+fn details_uri(name: &ScriptName) -> String {
+    format!("sks://scripts/{name}")
 }
 
-fn source_uri(id: ScriptId) -> String {
-    format!("sks://scripts/{id}/source")
+fn source_uri(name: &ScriptName) -> String {
+    format!("sks://scripts/{name}/source")
 }
 
-fn parse_script_uri(uri: &str) -> Option<(ScriptId, bool)> {
+fn parse_script_uri(uri: &str) -> Option<(ScriptName, bool)> {
     let remainder = uri.strip_prefix("sks://scripts/")?;
-    let (id, suffix) = remainder.split_once('/').unwrap_or((remainder, ""));
-    let id = id.parse().ok().map(ScriptId)?;
+    let (name, suffix) = remainder.split_once('/').unwrap_or((remainder, ""));
+    let name = name.parse().ok()?;
     match suffix {
-        "" => Some((id, false)),
-        "source" => Some((id, true)),
+        "" => Some((name, false)),
+        "source" => Some((name, true)),
         _ => None,
     }
 }

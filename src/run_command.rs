@@ -1,4 +1,4 @@
-use crate::registry::{PATH_PLACEHOLDER, ScriptId, display_path, load_skills};
+use crate::registry::{PATH_PLACEHOLDER, ScriptName, display_path, load_skills};
 use anyhow::{Context, Result, anyhow, bail};
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -6,7 +6,7 @@ use std::process::Command;
 use std::str::FromStr;
 
 pub(crate) struct RunInvocation {
-    pub(crate) id: ScriptId,
+    pub(crate) name: ScriptName,
     pub(crate) args: Vec<String>,
 }
 
@@ -19,25 +19,26 @@ pub(crate) fn parse(args: &[OsString]) -> Result<Option<RunInvocation>> {
     }
 
     let Some(id_raw) = args.get(2).and_then(|value| value.to_str()) else {
-        bail!("Usage: sks run <id> [args...]");
+        bail!("Usage: sks run <name> [args...]");
     };
 
-    let id = ScriptId::from_str(id_raw).map_err(|_| anyhow!("Invalid script id: {id_raw}"))?;
+    let name =
+        ScriptName::from_str(id_raw).map_err(|_| anyhow!("Invalid script name: {id_raw}"))?;
     let args = args
         .iter()
         .skip(3)
         .map(|value| value.to_string_lossy().into_owned())
         .collect();
 
-    Ok(Some(RunInvocation { id, args }))
+    Ok(Some(RunInvocation { name, args }))
 }
 
 pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
     let skills = load_skills()?;
     let skill = skills
         .iter()
-        .find(|skill| skill.id == invocation.id)
-        .ok_or_else(|| anyhow!("No script found for id {}.", invocation.id))?;
+        .find(|skill| skill.name == invocation.name)
+        .ok_or_else(|| anyhow!("No script found for name {}.", invocation.name))?;
 
     let mut parts = split_command(&skill.command)?
         .into_iter()
@@ -46,7 +47,7 @@ pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
     if parts.is_empty() {
         bail!(
             "Registered script {} command is empty after parsing.",
-            invocation.id
+            invocation.name
         );
     }
 
@@ -63,7 +64,7 @@ pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
         .with_context(|| {
             format!(
                 "failed to launch command for script {}: {}",
-                invocation.id, program
+                invocation.name, program
             )
         })?;
 
@@ -73,7 +74,7 @@ pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
     if !child.status.success() {
         bail!(
             "Registered script {} command exited with status {}.",
-            invocation.id,
+            invocation.name,
             child.status
         );
     }

@@ -22,7 +22,7 @@ pub(crate) fn script_name(skill: &Skill) -> String {
 pub(crate) fn script_search_text(skill: &Skill) -> String {
     format!(
         "{} {} {} {} {}",
-        skill.id,
+        skill.name,
         display_path(&skill.path),
         skill.command,
         skill.comment.as_deref().unwrap_or_default(),
@@ -55,7 +55,7 @@ pub(crate) fn search_skills<'a>(
         right
             .score
             .cmp(&left.score)
-            .then_with(|| left.skill.id.cmp(&right.skill.id))
+            .then_with(|| left.skill.name.cmp(&right.skill.name))
     });
     matches.truncate(
         limit
@@ -196,12 +196,13 @@ fn is_stop_word(term: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::ScriptId;
+    use crate::registry::ScriptName;
     use std::path::PathBuf;
+    use std::str::FromStr;
 
-    fn skill(id: u32, name: &str, comment: &str, tags: &[&str]) -> Skill {
+    fn skill(id: &str, name: &str, comment: &str, tags: &[&str]) -> Skill {
         Skill {
-            id: ScriptId(id),
+            name: ScriptName::from_str(id).unwrap(),
             path: PathBuf::from(name),
             command: "python {{path}}".to_string(),
             comment: Some(comment.to_string()),
@@ -212,37 +213,45 @@ mod tests {
     #[test]
     fn fuzzy_search_reuses_skim_matcher_and_orders_matches() {
         let skills = vec![
-            skill(2, "notes.py", "Manage notes", &["text"]),
-            skill(1, "markdown-pdf.py", "Convert Markdown to PDF", &["pdf"]),
+            skill("notes", "notes.py", "Manage notes", &["text"]),
+            skill(
+                "markdown",
+                "markdown-pdf.py",
+                "Convert Markdown to PDF",
+                &["pdf"],
+            ),
         ];
         let matches = search_skills(&skills, Some("markdown pdf"), &[], None);
-        assert_eq!(matches[0].skill.id, ScriptId(1));
+        assert_eq!(
+            matches[0].skill.name,
+            ScriptName::from_str("markdown").unwrap()
+        );
     }
 
     #[test]
     fn tags_are_optional_soft_signals_instead_of_hard_filters() {
         let skills = vec![
-            skill(1, "pdf.py", "Convert Markdown to PDF", &["PDF"]),
-            skill(2, "image.py", "Convert PNG images", &["image"]),
+            skill("pdf", "pdf.py", "Convert Markdown to PDF", &["PDF"]),
+            skill("image", "image.py", "Convert PNG images", &["image"]),
         ];
         assert_eq!(
             search_skills(&skills, Some("markdown pdf"), &[], None)[0]
                 .skill
-                .id,
-            ScriptId(1)
+                .name,
+            ScriptName::from_str("pdf").unwrap()
         );
         assert_eq!(
             search_skills(&skills, Some("markdown pdf"), &["image".to_string()], None)[0]
                 .skill
-                .id,
-            ScriptId(1)
+                .name,
+            ScriptName::from_str("pdf").unwrap()
         );
     }
 
     #[test]
     fn natural_language_query_recalls_scripts_without_tags() {
         let skills = vec![skill(
-            1,
+            "render",
             "render.py",
             "Convert Markdown documents into PDF files",
             &[],
@@ -262,10 +271,20 @@ mod tests {
     #[test]
     fn default_limit_returns_only_the_five_highest_value_matches() {
         let skills = (1..=8)
-            .map(|id| skill(id, &format!("pdf-{id}.py"), "Create PDF documents", &[]))
+            .map(|id| {
+                skill(
+                    &format!("pdf_{id}"),
+                    &format!("pdf-{id}.py"),
+                    "Create PDF documents",
+                    &[],
+                )
+            })
             .collect::<Vec<_>>();
         let matches = search_skills(&skills, Some("pdf"), &[], None);
         assert_eq!(matches.len(), 5);
-        assert_eq!(matches[0].skill.id, ScriptId(1));
+        assert_eq!(
+            matches[0].skill.name,
+            ScriptName::from_str("pdf_1").unwrap()
+        );
     }
 }

@@ -96,7 +96,7 @@ fn init_creates_global_config() {
     let authoring_skill = fs::read_to_string(env.installed_skill_file("sks-script-authoring"))
         .expect("authoring skill should be installed");
     assert!(authoring_skill.contains("name: sks-script-authoring"));
-    assert!(authoring_skill.contains("sks run <id> [args...]"));
+    assert!(authoring_skill.contains("sks run <name> [args...]"));
     let discovery_skill = fs::read_to_string(env.installed_skill_file("sks-script-discovery"))
         .expect("discovery skill should be installed");
     assert!(discovery_skill.contains("name: sks-script-discovery"));
@@ -195,10 +195,10 @@ fn list_outputs_registered_script_array() {
     env.write_global_config(
         r"
 scripts:
-  - id: 101
+  - name: script_101
     path: scripts/alpha.py
     command: python {{path}}
-  - id: 102
+  - name: script_102
     path: scripts/beta.py
     command: python {{path}}
 ",
@@ -209,7 +209,7 @@ scripts:
         .arg("list")
         .assert()
         .success()
-        .stdout(predicate::str::starts_with("- id:"));
+        .stdout(predicate::str::starts_with("- name:"));
 
     let stdout = String::from_utf8(assert.get_output().stdout.clone())
         .expect("stdout should be valid UTF-8");
@@ -217,7 +217,7 @@ scripts:
         serde_yaml::from_str(&stdout).expect("list should emit a valid YAML array");
 
     assert_eq!(skills.len(), 2);
-    assert_eq!(skills[0]["id"].as_i64(), Some(101));
+    assert_eq!(skills[0]["name"].as_str(), Some("script_101"));
     assert_eq!(skills[0]["command"].as_str(), Some("python {{path}}"));
     assert!(
         skills[0]["path"]
@@ -240,7 +240,7 @@ fn list_preserves_registered_script_comment() {
     env.write_global_config(
         r"
 scripts:
-  - id: 103
+  - name: script_103
     path: scripts/commented.py
     command: python {{path}}
     comment: Run the commented test script
@@ -271,11 +271,11 @@ fn list_normalizes_optional_tags_without_breaking_old_entries() {
     env.write_global_config(
         r"
 scripts:
-  - id: 110
+  - name: script_110
     path: scripts/tagged.py
     command: python {{path}}
     tags: [' PDF ', document, pdf]
-  - id: 111
+  - name: script_111
     path: scripts/legacy.py
     command: python {{path}}
 ",
@@ -337,7 +337,7 @@ fn list_reads_registered_scripts_immediately() {
     env.write_global_config(
         r"
 scripts:
-  - id: 1
+  - name: script_1
     path: scripts/hello.py
     command: python {{path}}
 ",
@@ -371,7 +371,7 @@ imports:
         imported_dir.join("scripts.yaml"),
         r"
 scripts:
-  - id: 1
+  - name: script_1
     path: scripts/one.py
     command: python {{path}}
 ",
@@ -389,10 +389,10 @@ scripts:
         imported_dir.join("scripts.yaml"),
         r"
 scripts:
-  - id: 1
+  - name: script_1
     path: scripts/one.py
     command: python {{path}}
-  - id: 2
+  - name: script_2
     path: scripts/two.py
     command: python {{path}}
 ",
@@ -420,7 +420,7 @@ fn list_normalizes_registered_script_paths() {
     env.write_global_config(
         r"
 scripts:
-  - id: 301
+  - name: script_301
     path: scripts/../scripts/normalized.py
     command: python {{path}}
 ",
@@ -465,7 +465,7 @@ fn pick_uses_registered_scripts_without_scan_headers() {
     env.write_global_config(
         r"
 scripts:
-  - id: 1
+  - name: script_1
     path: scripts/echo.py
     command: python {{path}} echo
 ",
@@ -500,7 +500,7 @@ fn list_rejects_missing_registered_script_files() {
     env.write_global_config(
         r"
 scripts:
-  - id: 1
+  - name: script_1
     path: scripts/missing.py
     command: python {{path}}
 ",
@@ -586,7 +586,7 @@ imports:
         imported_dir.join("scripts.yaml"),
         r"
 scripts:
-  - id: 401
+  - name: script_401
     path: ./tools/../tools/clean.py
     command: python {{path}}
 ",
@@ -625,14 +625,14 @@ fn run_replaces_path_placeholder_and_appends_extra_args() {
     env.write_global_config(&format!(
         r#"
 scripts:
-  - id: 501
+  - name: script_501
     path: scripts/{script_name}
     command: {command}
 "#,
     ));
 
     env.command(&workspace)
-        .args(["run", "501", "one", "--flag", "three"])
+        .args(["run", "script_501", "one", "--flag", "three"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Running:"))
@@ -667,14 +667,14 @@ fn run_preserves_unquoted_placeholder_path_with_spaces() {
     env.write_global_config(&format!(
         r"
 scripts:
-  - id: 503
+  - name: script_503
     path: scripts with spaces/{script_name}
     command: {command}
 ",
     ));
 
     env.command(&workspace)
-        .args(["run", "503"])
+        .args(["run", "script_503"])
         .assert()
         .success()
         .stdout(predicate::str::contains("scripts with spaces"))
@@ -694,14 +694,14 @@ fn run_requires_path_placeholder() {
     env.write_global_config(
         r"
 scripts:
-  - id: 502
+  - name: script_502
     path: scripts/echo.ps1
     command: powershell -NoProfile -ExecutionPolicy Bypass -File
 ",
     );
 
     env.command(&workspace)
-        .args(["run", "502"])
+        .args(["run", "script_502"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("must contain {{path}}"));
@@ -710,15 +710,17 @@ scripts:
 #[test]
 fn run_reports_missing_id() {
     let env = TestEnv::new();
-    let workspace = env.root().join("workspace-run-missing-id");
+    let workspace = env.root().join("workspace-run-missing-name");
     fs::create_dir_all(&workspace).expect("failed to create workspace");
     env.write_global_config("scripts: []\n");
 
     env.command(&workspace)
-        .args(["run", "999"])
+        .args(["run", "missing_script"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No script found for id 999."));
+        .stderr(predicate::str::contains(
+            "No script found for name missing_script.",
+        ));
 }
 
 #[test]
@@ -732,7 +734,7 @@ fn run_reports_usage_without_id() {
         .arg("run")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Usage: sks run <id> [args...]"));
+        .stderr(predicate::str::contains("Usage: sks run <name> [args...]"));
 }
 
 #[test]
@@ -746,7 +748,7 @@ fn mcp_exposes_search_instructions_results_and_source_resources() {
     env.write_global_config(
         r"
 scripts:
-  - id: 701
+  - name: script_701
     path: scripts/markdown_pdf.py
     command: python {{path}}
     comment: Convert Markdown documents to PDF
@@ -759,7 +761,7 @@ scripts:
         "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"search_scripts\",\"arguments\":{\"query\":\"markdown pdf\"}}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"search_scripts\",\"arguments\":{\"query\":\"nonexistent xyz\"}}}\n",
-        "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"resources/read\",\"params\":{\"uri\":\"sks://scripts/701/source\"}}\n"
+        "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"resources/read\",\"params\":{\"uri\":\"sks://scripts/script_701/source\"}}\n"
     );
 
     env.command(&workspace)
@@ -773,7 +775,7 @@ scripts:
         ))
         .stdout(predicate::str::contains("readOnlyHint"))
         .stdout(predicate::str::contains("search_scripts"))
-        .stdout(predicate::str::contains("sks run 701 [args...]"))
+        .stdout(predicate::str::contains("sks run script_701 [args...]"))
         .stdout(predicate::str::contains(
             "No matching registered scripts found",
         ))
@@ -795,10 +797,10 @@ fn mcp_uses_the_global_search_limit_when_the_request_omits_limit() {
 mcp:
   search_limit: 2
 scripts:
-  - { id: 1, path: scripts/pdf-1.py, command: 'python {{path}}', comment: Create PDF }
-  - { id: 2, path: scripts/pdf-2.py, command: 'python {{path}}', comment: Create PDF }
-  - { id: 3, path: scripts/pdf-3.py, command: 'python {{path}}', comment: Create PDF }
-  - { id: 4, path: scripts/pdf-4.py, command: 'python {{path}}', comment: Create PDF }
+  - { name: script_1, path: scripts/pdf-1.py, command: 'python {{path}}', comment: Create PDF }
+  - { name: script_2, path: scripts/pdf-2.py, command: 'python {{path}}', comment: Create PDF }
+  - { name: script_3, path: scripts/pdf-3.py, command: 'python {{path}}', comment: Create PDF }
+  - { name: script_4, path: scripts/pdf-4.py, command: 'python {{path}}', comment: Create PDF }
 ",
     );
     let requests = concat!(
@@ -817,7 +819,7 @@ scripts:
     let response = output
         .lines()
         .filter_map(|line| serde_yaml::from_str::<serde_yaml::Value>(line).ok())
-        .find(|value| value["id"].as_i64() == Some(2))
+        .find(|value| value["result"]["structuredContent"]["matches"].is_sequence())
         .expect("tool response should be present");
     assert_eq!(
         response["result"]["structuredContent"]["matches"]

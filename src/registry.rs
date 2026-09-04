@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
-use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -13,21 +12,45 @@ pub(crate) const PATH_PLACEHOLDER: &str = "{{path}}";
 pub(crate) const DEFAULT_MCP_SEARCH_LIMIT: usize = 5;
 pub(crate) const MAX_MCP_SEARCH_LIMIT: usize = 10;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 #[serde(transparent)]
-pub(crate) struct ScriptId(pub(crate) u32);
+pub(crate) struct ScriptName(String);
 
-impl fmt::Display for ScriptId {
+impl fmt::Display for ScriptName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl FromStr for ScriptId {
-    type Err = ParseIntError;
+impl ScriptName {
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl FromStr for ScriptName {
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<u32>().map(Self)
+        let mut chars = s.chars();
+        match chars.next() {
+            Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {}
+            _ => return Err(format!("invalid script name `{s}`")),
+        }
+        if !chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+            return Err(format!("invalid script name `{s}`"));
+        }
+        Ok(Self(s.to_owned()))
+    }
+}
+
+impl<'de> Deserialize<'de> for ScriptName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -49,7 +72,7 @@ pub(crate) struct McpConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ScriptRegistration {
-    pub(crate) id: ScriptId,
+    pub(crate) name: ScriptName,
     pub(crate) path: String,
     pub(crate) command: String,
     #[serde(default)]
@@ -60,7 +83,7 @@ pub(crate) struct ScriptRegistration {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct Skill {
-    pub(crate) id: ScriptId,
+    pub(crate) name: ScriptName,
     #[serde(serialize_with = "serialize_path")]
     pub(crate) path: PathBuf,
     pub(crate) command: String,
@@ -130,11 +153,11 @@ pub(crate) fn load_registry() -> Result<LoadedRegistry> {
         .map_or(DEFAULT_MCP_SEARCH_LIMIT, |mcp| mcp.search_limit);
     let mut skills = build_skills(&sources)?;
     skills.sort_by(|left, right| {
-        left.id
-            .cmp(&right.id)
+        left.name
+            .cmp(&right.name)
             .then_with(|| left.path.cmp(&right.path))
     });
-    validate_unique_ids(&skills)?;
+    validate_unique_names(&skills)?;
     Ok(LoadedRegistry {
         skills,
         mcp_search_limit,
@@ -227,28 +250,28 @@ fn build_skill(
     if !path.is_file() {
         bail!(
             "Registered script {} points to a missing file: {}",
-            entry.id,
+            entry.name,
             path.display()
         );
     }
 
     if entry.command.trim().is_empty() {
-        bail!("Registered script {} has an empty command.", entry.id);
+        bail!("Registered script {} has an empty command.", entry.name);
     }
     if !entry.command.contains(PATH_PLACEHOLDER) {
         bail!(
             "Registered script {} command must contain {}.",
-            entry.id,
+            entry.name,
             PATH_PLACEHOLDER
         );
     }
 
     Ok(Skill {
-        id: entry.id,
+        name: entry.name.clone(),
         path,
         command: entry.command.clone(),
         comment: entry.comment.clone(),
-        tags: normalize_tags(entry.id, &entry.tags)?,
+        tags: normalize_tags(&entry.name, &entry.tags)?,
     })
 }
 
@@ -271,12 +294,12 @@ impl PathResolver<'_> {
     }
 }
 
-fn normalize_tags(id: ScriptId, tags: &[String]) -> Result<Vec<String>> {
+fn normalize_tags(name: &ScriptName, tags: &[String]) -> Result<Vec<String>> {
     let mut normalized = Vec::new();
     for tag in tags {
         let tag = tag.trim();
         if tag.is_empty() {
-            bail!("Registered script {id} contains an empty tag.");
+            bail!("Registered script {name} contains an empty tag.");
         }
         if !normalized
             .iter()
@@ -288,13 +311,13 @@ fn normalize_tags(id: ScriptId, tags: &[String]) -> Result<Vec<String>> {
     Ok(normalized)
 }
 
-fn validate_unique_ids(skills: &[Skill]) -> Result<()> {
-    let mut seen: HashMap<ScriptId, &Path> = HashMap::new();
+fn validate_unique_names(skills: &[Skill]) -> Result<()> {
+    let mut seen: HashMap<&ScriptName, &Path> = HashMap::new();
     for skill in skills {
-        if let Some(existing) = seen.insert(skill.id, skill.path.as_path()) {
+        if let Some(existing) = seen.insert(&skill.name, skill.path.as_path()) {
             bail!(
-                "Duplicate id {} found in {} and {}",
-                skill.id,
+                "Duplicate name {} found in {} and {}",
+                skill.name,
                 display_path(existing),
                 display_path(&skill.path)
             );
@@ -340,4 +363,32 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_str(&display_path(path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScriptName;
+    use std::str::FromStr;
+
+    #[test]
+    fn accepts_python_ascii_identifier_names() {
+        for value in ["foo", "_internal", "ConvertCSV2"] {
+            assert!(ScriptName::from_str(value).is_ok());
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_script_names() {
+        for value in [
+            "",
+            "123script",
+            "foo-bar",
+            "foo.bar",
+            "foo/bar",
+            "foo bar",
+            "中文",
+        ] {
+            assert!(ScriptName::from_str(value).is_err(), "{value}");
+        }
+    }
 }

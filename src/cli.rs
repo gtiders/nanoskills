@@ -12,7 +12,7 @@ use std::ffi::OsString;
 #[command(name = "sks")]
 #[command(about = "Registry-driven script launcher and picker")]
 #[command(
-    after_help = "Special command:\n  run <id> [args...]  Run a registered script and pass through all remaining args"
+    after_help = "Special command:\n  run <name> [args...]  Run a registered script and pass through all remaining args"
 )]
 #[command(version)]
 struct Cli {
@@ -67,7 +67,7 @@ fn run_init(force: bool) -> Result<()> {
     }
     println!("This config supports only:");
     println!("- imports");
-    println!("- scripts[].id");
+    println!("- scripts[].name");
     println!("- scripts[].path");
     println!("- scripts[].command");
     println!("- scripts[].comment");

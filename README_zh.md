@@ -9,7 +9,7 @@
 
 每个脚本注册项包含三个必填字段，并可添加描述与搜索标签：
 
-- `id`
+- `name`
 - `path`
 - `command`
 - `comment`（可选描述）
@@ -29,7 +29,7 @@ imports:
   - lang/python.yaml
 
 scripts:
-  - id: 1
+  - name: hello_world
     path: scripts/hello.py
     command: python {{path}}
     comment: 向用户问好
@@ -40,7 +40,7 @@ scripts:
 
 ```yaml
 scripts:
-  - id: 2
+  - name: build_tool
     path: tools/build.py
     command: python {{path}}
 ```
@@ -51,7 +51,7 @@ scripts:
 - 所有平台的注册表路径都必须使用 Unix 风格 `/` 分隔符
 - 配置始终位于 `~/.config/sks`，不会使用 AppData
 - imported 文件不能再声明 `imports`
-- `id` 必须全局唯一
+- `name` 必须符合 `[A-Za-z_][A-Za-z0-9_]*` 且全局唯一
 - `command` 必须包含 `{{path}}`
 
 ## 命令
@@ -60,14 +60,14 @@ scripts:
 sks init
 sks list
 sks pick
-sks run 1 foo --bar baz
+sks run hello_world foo --bar baz
 sks mcp
 ```
 
 - `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-discovery` 与 `sks-script-authoring` Agent Skills
 - `list` 以 YAML 输出所有已注册脚本
 - `pick` 打开交互式选择器，并显示表格化列表与语法高亮预览
-- `run <id> [args...]` 替换 `command` 中的 `{{path}}`，并把剩余参数全部追加到命令尾部
+- `run <name> [args...]` 替换 `command` 中的 `{{path}}`，并把剩余参数全部追加到命令尾部
 - `mcp` 通过 stdio 启动本地 MCP server
 
 ## MCP
@@ -85,15 +85,15 @@ sks mcp
 
 MCP 指令采用“先搜索、后新写”的触发策略：当任务可以通过脚本执行时，模型应在编写临时代码或 shell 命令前搜索一次，即使用户没有提到 sks、本地脚本或已有工具。计算、格式转换、文件与数据处理、内容生成、校验和构建流程都会触发；纯概念讨论则不触发。任何明确要求“使用脚本”的请求都必须先搜索，不因任务看起来简单或临时编写代码更快而跳过。工具同时声明为只读、幂等且不访问外部世界，以降低模型对试探性调用的风险判断。
 
-找到脚本后，结果会提供 `sks run <id> [args...]` 和资源 URI；参数不清楚时，模型可以按需读取源码。没有匹配项是正常的成功结果，不会阻止模型换用其他方式继续工作。
+找到脚本后，结果会提供 `sks run <name> [args...]` 和资源 URI；参数不清楚时，模型可以按需读取源码。没有匹配项是正常的成功结果，不会阻止模型换用其他方式继续工作。
 
 `sks init` 安装两个互补的 Agent Skills：`sks-script-discovery` 让兼容代理在一次性编程前主动发现并复用已有脚本，`sks-script-authoring` 指导代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。最终是否调用工具仍由 MCP 客户端和模型决定；服务器说明与 Skill 会显著增强触发倾向，但不能从协议层强制调用。
 
 ## Picker
 
-`pick` 的结果列表显示脚本 ID 和描述：
+`pick` 的结果列表显示脚本名称和描述：
 
-- `ID`
+- `NAME`
 - `COMMENT`
 
 右侧预览区会直接渲染完整脚本文件内容，并使用内嵌 `syntect` 做语法高亮。当前默认主题是 GitHub Dark，预览背景由 skim 控制。
@@ -103,16 +103,16 @@ MCP 指令采用“先搜索、后新写”的触发策略：当任务可以通�
 `run` 的设计是刻意保持极简：
 
 ```bash
-sks run 12 input.txt --mode fast
+sks run example_script input.txt --mode fast
 ```
 
 它的行为是：
 
-1. 找到 `id: 12`
+1. 找到 `name: hello_world2`
 2. 替换 `command` 中的 `{{path}}`
 3. 把 `input.txt --mode fast` 原样追加到命令后面
 
-也就是说，`run` 在 `<id>` 之后不再保留自己的选项解析层。
+也就是说，`run` 在 `<name>` 之后不再保留自己的选项解析层。
 
 ## 安装
 

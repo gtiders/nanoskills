@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced numeric script IDs with explicitly named Python-style identifiers in registry configuration, CLI usage, Picker output, and MCP resources. This is an incompatible configuration format change.
+
 ## [1.2.0] - 2026-08-04
 
 ### Added

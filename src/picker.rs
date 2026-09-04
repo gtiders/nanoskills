@@ -32,7 +32,7 @@ const SKIM_COLORS: &str = concat!(
 const PICKER_HEADER: &str =
     "Type to filter  |  Enter run  |  Esc cancel  |  Preview: YAML metadata + script content";
 const COLUMN_GAP: &str = "  ";
-const ID_WIDTH: usize = 6;
+const NAME_WIDTH: usize = 18;
 const GITHUB_DARK_THEME: &[u8] = include_bytes!("themes/github-dark.tmTheme");
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
@@ -96,7 +96,7 @@ impl SkimItem for PickerItem {
     fn display(&self, context: DisplayContext) -> Line<'_> {
         Line::from(format_row(
             context.container_width,
-            self.skill.id.0,
+            self.skill.name.as_str(),
             self.skill.comment.as_deref(),
         ))
     }
@@ -172,12 +172,12 @@ fn preview_theme() -> &'static Theme {
     })
 }
 
-fn format_row(total_width: usize, id: u32, comment: Option<&str>) -> String {
-    let id_width = ID_WIDTH.min(total_width);
-    let id_text = format!("{id:<id_width$}");
-    let comment_width = total_width.saturating_sub(id_width + COLUMN_GAP.len());
+fn format_row(total_width: usize, name: &str, comment: Option<&str>) -> String {
+    let name_width = NAME_WIDTH.min(total_width);
+    let name_text = truncate(name, name_width, false);
+    let comment_width = total_width.saturating_sub(name_width + COLUMN_GAP.len());
     let comment_text = truncate_right(comment.unwrap_or_default(), comment_width);
-    format!("{id_text}{COLUMN_GAP}{comment_text}")
+    format!("{name_text}{COLUMN_GAP}{comment_text}")
 }
 
 fn truncate_right(value: &str, width: usize) -> String {
@@ -217,13 +217,14 @@ fn truncate(value: &str, width: usize, left: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::ScriptId;
+    use crate::registry::ScriptName;
     use std::path::PathBuf;
+    use std::str::FromStr;
 
     #[test]
     fn preview_starts_with_yaml_metadata() {
         let skill = Skill {
-            id: ScriptId(7),
+            name: ScriptName::from_str("example").unwrap(),
             path: PathBuf::from("scripts/example.py"),
             command: "python {{path}}".to_string(),
             comment: Some("example script".to_string()),
@@ -234,7 +235,7 @@ mod tests {
         let plain = strip_ansi(&preview);
 
         assert!(plain.contains("# YAML"));
-        assert!(plain.contains("id: 7"));
+        assert!(plain.contains("name: example"));
         assert!(plain.contains("path: scripts/example.py"));
         assert!(plain.contains("command: python {{path}}"));
         assert!(plain.contains("comment: example script"));
@@ -246,7 +247,7 @@ mod tests {
     #[test]
     fn preview_keeps_final_line_without_trailing_newline() {
         let skill = Skill {
-            id: ScriptId(8),
+            name: ScriptName::from_str("no_newline").unwrap(),
             path: PathBuf::from("scripts/no_newline.py"),
             command: "python {{path}}".to_string(),
             comment: None,
