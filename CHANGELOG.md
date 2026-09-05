@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-09-05
+
+### Fixed
+
+- Stage self-updates beside the current executable before atomic replacement, avoiding cross-device rename failures.
+
 ## [1.2.8] - 2026-09-05
 
 ### Fixed

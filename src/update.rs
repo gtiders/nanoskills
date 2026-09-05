@@ -180,8 +180,16 @@ fn replace_current(replacement: &Path, current: &Path) -> Result<()> {
     #[cfg(not(windows))]
     {
         let permissions = fs::metadata(current)?.permissions();
-        fs::set_permissions(replacement, permissions)?;
-        fs::rename(replacement, current).context("failed to replace the current executable")?;
+        let parent = current
+            .parent()
+            .ok_or_else(|| anyhow!("current executable has no parent directory"))?;
+        let staged = parent.join(format!(".sks-update-{}", std::process::id()));
+        fs::copy(replacement, &staged).context("failed to stage the executable locally")?;
+        fs::set_permissions(&staged, permissions)?;
+        if let Err(error) = fs::rename(&staged, current) {
+            let _ = fs::remove_file(&staged);
+            return Err(error).context("failed to replace the current executable");
+        }
         Ok(())
     }
 }
