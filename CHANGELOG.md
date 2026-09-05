@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-09-05
+
+### Fixed
+
+- Increased GitHub release download timeouts, added retries, and fixed updater staging paths.
+
 ## [1.2.7] - 2026-09-05
 
 ## [1.2.6] - 2026-09-05

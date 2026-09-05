@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 const REPOSITORY: &str = "gtiders/skillscripts";
 
@@ -23,6 +25,8 @@ struct Asset {
 pub(crate) fn run(check_only: bool, force: bool) -> Result<()> {
     let client = Client::builder()
         .user_agent(concat!("sks/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(Duration::from_secs(20))
+        .timeout(Duration::from_secs(300))
         .build()?;
     let release: Release = client
         .get(format!(
@@ -70,7 +74,9 @@ pub(crate) fn run(check_only: bool, force: bool) -> Result<()> {
         fs::remove_dir_all(&temp_root)?;
     }
     fs::create_dir_all(&temp_root)?;
-    let result = install_archive(&archive_bytes, &temp_root);
+    let extract_root = temp_root.join("extracted");
+    fs::create_dir_all(&extract_root)?;
+    let result = install_archive(&archive_bytes, &extract_root);
     if result.is_err() {
         let _ = fs::remove_dir_all(&temp_root);
     }
@@ -84,15 +90,29 @@ pub(crate) fn run(check_only: bool, force: bool) -> Result<()> {
 }
 
 fn download(client: &Client, url: &str) -> Result<Vec<u8>> {
-    Ok(client
-        .get(url)
-        .send()
-        .context("failed to download release asset")?
-        .error_for_status()
-        .context("GitHub rejected the release asset download")?
-        .bytes()
-        .context("failed to read release asset")?
-        .to_vec())
+    let mut last_error = None;
+    for attempt in 1..=3 {
+        match client
+            .get(url)
+            .send()
+            .and_then(|response| response.error_for_status())
+        {
+            Ok(response) => {
+                return response
+                    .bytes()
+                    .map(|bytes| bytes.to_vec())
+                    .context("failed to read release asset");
+            }
+            Err(error) => {
+                last_error = Some(error);
+                if attempt < 3 {
+                    eprintln!("Download attempt {attempt} failed; retrying...");
+                    thread::sleep(Duration::from_secs(2));
+                }
+            }
+        }
+    }
+    Err(last_error.unwrap()).context("failed to download release asset after 3 attempts")
 }
 
 fn verify_checksum(name: &str, bytes: &[u8], checksums: &str) -> Result<()> {
