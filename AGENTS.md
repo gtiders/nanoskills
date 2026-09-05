@@ -1,48 +1,75 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-The codebase is intentionally flat. Runtime logic lives in four source files:
+## Project Structure
 
-- `src/main.rs` for process entry and top-level error reporting
-- `src/cli.rs` for command dispatch and YAML output
-- `src/run_command.rs` for `sks run <id> [args...]`
-- `src/picker.rs` for the skim UI and syntect preview rendering
-- `src/registry.rs` for config loading, validation, path resolution, and registry models
+Runtime code is organized by responsibility:
 
-Integration tests live in `tests/`. Shared helpers are in `tests/support/mod.rs`. Keep build output in `target/` out of version control.
+- `src/main.rs` — process entry point and top-level error reporting
+- `src/cli.rs` — CLI parsing, command dispatch, and YAML output
+- `src/registry.rs` — YAML loading, imports, validation, path resolution, and registry models
+- `src/run_command.rs` — `sks run <name> [args...]`, snapshots, command expansion, and execution
+- `src/picker.rs` — interactive skim picker and syntax-highlighted preview
+- `src/search.rs` — script search and ranking
+- `src/mcp.rs` — MCP server, search tool, and resource handlers
+- `src/skill.rs` — `sks skill use/create` output
+- `src/update.rs` — GitHub Release lookup, target selection, checksum verification, and replacement
+- `src/init.rs` — configuration and Agent Skill initialization
+- `src/portable_path.rs` — platform-independent configuration paths
+- `assets/skills/sks-script-use/SKILL.md` — guidance for discovering and running scripts
+- `assets/skills/sks-script-create/SKILL.md` — guidance for writing and registering scripts
+- `tests/cli.rs` — integration tests and shared test helpers
 
-## Build, Test, and Development Commands
-- `cargo build` builds the binary in debug mode.
-- `cargo run -- --help` shows the current CLI surface.
-- `cargo run -- list` prints registered scripts from the real global config.
-- `cargo test` runs the full integration test suite.
-- `cargo clippy --all-targets --all-features -- -D warnings` enforces a clean lint baseline.
-- `cargo fmt --all` formats the repository.
+Keep build output in `target/`; it is not versioned.
 
-## Coding Style & Naming Conventions
-Use standard Rust formatting with 4-space indentation. Prefer small functions and direct data flow over extra abstraction layers. Follow existing naming:
+## Configuration and Naming
 
-- `snake_case` for functions, modules, and tests
-- `UpperCamelCase` for types
-- concise module names that reflect one responsibility
+The global configuration is `~/.config/sks/sks.yaml`. Script registrations use `name`, `path`, `command`, optional `comment`, and optional `tags` fields.
 
-Avoid rebuilding deep `app/domain/infra` style nesting unless the project genuinely grows into it.
+Names must match the Python-style ASCII rule `[A-Za-z_][A-Za-z0-9_]*`, are case-sensitive, and are globally unique. Paths must be relative Unix-style paths. Commands must contain the `{{path}}` placeholder. Do not reintroduce numeric IDs, aliases, fuzzy execution, or compatibility parsing for the old `id` field.
 
-## Testing Guidelines
-Group tests by behavior, not by internal module names. Current suites are:
+`sks run <name> [args...]` matches names exactly, passes through all remaining arguments, and copies the registered source to `.sks/<filename>` in the current working directory before execution. The copy is replaced when the filename already exists.
 
-- `tests/init_cli.rs`
-- `tests/list_pick_cli.rs`
-- `tests/registry_validation_cli.rs`
-- `tests/run_cli.rs`
+## Development Commands
 
-Use `assert_cmd`, `predicates`, and temp directories through `TestEnv`. Cover both happy paths and validation failures.
+```bash
+cargo build
+cargo run -- --help
+cargo run -- list
+cargo test
+cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+git diff --check
+```
 
-## Commit & Pull Request Guidelines
-Recent history uses short imperative subjects, often with prefixes like `fix:`, `refactor:`, `chore:`, or `release:`. Keep each commit scoped to one logical change.
+Use `cargo run -- list` with the real global configuration only for local manual checks. Tests should use temporary configuration through the existing `TestEnv` helper.
 
-PRs should include:
+## Coding Style
 
-- a concise behavior summary
-- relevant command output for `cargo test` and `cargo clippy`
-- screenshots only when the picker UI changes
+Use standard Rust formatting and four-space indentation. Use `snake_case` for functions, modules, and tests; `UpperCamelCase` for types; and concise names that describe one responsibility. Prefer direct data flow and small functions. Avoid introducing deep application-layer nesting without a concrete need.
+
+## Testing
+
+Group tests by user-visible behavior. Cover successful and failing cases for:
+
+- valid and invalid script names
+- duplicate names and configuration errors
+- list and picker YAML output
+- exact `run` matching, argument passthrough, path replacement, and `.sks` snapshots
+- MCP search results and `sks://scripts/<name>` resources
+- skill command output
+- update checks where network-independent tests are possible
+
+Use `assert_cmd`, `predicates`, and temporary directories. Run the full validation set before submitting changes:
+
+```bash
+cargo fmt --all
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+git diff --check
+```
+
+## Commits and Pull Requests
+
+Use short imperative commit subjects, commonly prefixed with `fix:`, `refactor:`, `chore:`, or `release:`. Keep each commit limited to one logical change.
+
+Pull requests should include a concise behavior summary and the relevant `cargo test` and Clippy results. Include screenshots only when changing the picker interface.

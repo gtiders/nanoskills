@@ -5,10 +5,10 @@ description: Discover and reuse registered sks scripts before writing one-off co
 
 # Use an sks script
 
-1. Before writing, generating, or running ad-hoc code or shell commands for an executable task, call the sks MCP `search_scripts` tool once with a concise capability query. Preserve important domain terms and the user's language.
-2. Treat every request to use a script as an explicit search trigger, regardless of the task's apparent simplicity or whether writing new code seems faster.
-3. Choose useful matches by description and tags. Read the script resource when its arguments or behavior are unclear; never invent arguments.
-4. Run a selected script with `sks run <name> [args...]` when execution is available and appropriate.
-5. If no useful match exists, continue with the normal approach. Do not repeat equivalent searches.
+1. For an executable task, search once with the sks MCP `search_scripts` tool before writing or running ad-hoc code or shell commands. Use a concise capability query and preserve the user's domain terms.
+2. Treat every request to use a script as an explicit search trigger, regardless of task size.
+3. Select matches by `comment` and `tags`. Read the source resource or run `--help` when arguments or behavior are unclear; do not invent arguments.
+4. Run a selected script with `sks run <name> [args...]` when execution is available and appropriate. The name is case-sensitive and must be copied exactly from the result.
+5. If no useful match exists, continue with another approach. Do not repeat equivalent searches.
 
-Skip discovery for purely conceptual discussion that requires no execution. A search is cheap and read-only; do not require the user to ask for an existing or local tool.
+Skip discovery for purely conceptual discussion that requires no execution. Do not force a script when no registered script matches the task.

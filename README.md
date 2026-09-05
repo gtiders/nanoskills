@@ -1,84 +1,63 @@
 # sks
 
-Minimal registry-driven script launcher and picker CLI.
+Registry-based launcher for local scripts. `sks` loads explicit YAML registrations, lists and searches them, runs a selected script, and exposes the registry through MCP.
 
-## Overview
+## Features
 
-`sks` reads a single global config file at `~/.config/sks/sks.yaml`.  
-Scripts are registered explicitly; the tool does not scan directories or parse script headers.
+- Exact execution by Python-style ASCII name: `[A-Za-z_][A-Za-z0-9_]*`.
+- YAML registry with imports, descriptions, and tags.
+- Interactive picker with source preview and syntax highlighting.
+- MCP search and read-only resources for script metadata and source.
+- Pre-execution snapshot to `.sks/<filename>` in the current directory.
+- Self-update from the latest GitHub Release with target-aware asset selection and checksum verification.
+- Built-in instructions for script use and script creation.
 
-Each registered script has three required fields plus an optional description and search tags:
+## Requirements
 
-- `name`
-- `path`
-- `command`
-- `comment` (optional description)
-- `tags` (optional search terms)
+- Rust 1.85 or newer when building from source.
+- Python or another runtime required by each registered script.
+- An MCP client is required only for MCP integration.
 
-`path` is resolved relative to the YAML file that defines it. Only the global config may declare `imports`.
+## Installation
 
-## Config Format
+Build and install from source:
 
-Global config:
-
-```yaml
-mcp:
-  search_limit: 5
-
-imports:
-  - lang/python.yaml
-
-scripts:
-  - name: hello_world
-    path: scripts/hello.py
-    command: python {{path}}
-    comment: Say hello to a user
-    tags: [hello, text]
+```bash
+git clone https://github.com/gtiders/skillscripts.git
+cd skillscripts
+cargo install --path .
 ```
 
-Imported config:
-
-```yaml
-scripts:
-  - name: build_tool
-    path: tools/build.py
-    command: python {{path}}
-```
-
-Rules:
-
-- only relative paths are allowed
-- registry paths always use Unix-style `/` separators on every platform
-- configuration always lives under `~/.config/sks`, never AppData
-- imported files cannot declare `imports`
-- `name` must match `[A-Za-z_][A-Za-z0-9_]*` and be globally unique
-- `command` must contain `{{path}}`
-
-## Commands
+Initialize the global configuration:
 
 ```bash
 sks init
-sks list
-sks pick
-sks run hello_world foo --bar baz
-sks mcp
-sks skill use
-sks skill create
-sks update --check
 ```
 
-- `init` creates `~/.config/sks/sks.yaml`, an empty imported `scripts.yaml`, and the `sks-script-use` and `sks-script-create` Agent Skills under `~/.agents/skills`
-- `list` outputs all registered scripts as YAML
-- `pick` opens the interactive picker with a table-style list and syntax-highlighted file preview
-- `run <name> [args...]` replaces `{{path}}` in `command` and appends all remaining args
-- `mcp` runs a local MCP server over stdio
-- `skill use` prints instructions for using registered scripts
-- `skill create` prints instructions for creating and registering scripts
-- `update` installs the latest GitHub release for this binary's compiled target
+The configuration directory is `~/.config/sks`. `init` creates `sks.yaml`, an empty `scripts.yaml`, and the `sks-script-use` and `sks-script-create` Agent Skills under `~/.agents/skills`.
 
-## MCP
+## Usage
 
-Configure an MCP client to launch:
+```bash
+sks list
+sks pick
+sks run <name> [args...]
+sks skill use
+sks skill create
+sks update
+sks update --check
+sks update --force
+```
+
+`run` matches `name` exactly. All arguments after the name are appended to the registered command. Before execution, the source file is copied to `.sks/<filename>` in the current directory; an existing file with the same name is replaced. The copy is made even if the command exits with an error.
+
+`list` prints the effective registry as YAML. `pick` provides an interactive name and comment list with a source preview.
+
+`update` queries the GitHub latest Release, selects the asset matching the binary's compiled Rust target (including GNU or musl), verifies `checksums.txt`, and replaces the current executable. `--check` does not install; `--force` installs even when the version comparison is inconclusive.
+
+### MCP
+
+Configure an MCP client to start the server over stdio:
 
 ```json
 {
@@ -87,47 +66,69 @@ Configure an MCP client to launch:
 }
 ```
 
-The server is read-only. It exposes one model-controlled tool, `search_scripts`, plus resources for the registry, script metadata, and source code. Search uses the same skim fuzzy matcher as the picker. Natural-language query terms drive recall; optional tags are soft ranking hints rather than required filters. `mcp.search_limit` in the global config controls the default number of results from 1 to 10; it defaults to 5, and a tool call can temporarily override it with `limit`. Imported configs cannot declare MCP options. Every request reloads the registry, so YAML changes are visible on the next search without restarting the server.
+The server provides `search_scripts` and read-only resources:
 
-The MCP instructions use a search-before-authoring policy: for executable tasks, the model should search once before writing ad-hoc code or shell commands even when the user does not mention sks, local scripts, or existing tools. Calculations, conversions, file and data processing, generation, validation, and build workflows are triggers; purely conceptual discussion is not. Every explicit request to use a script must trigger discovery, regardless of whether the task appears simple or writing new code seems faster. The tool is also annotated as read-only, idempotent, and closed-world so clients can treat exploratory searches as low risk.
-
-When a match is found, the result includes `sks run <name> [args...]` and resource URIs. The model can inspect source when arguments are unclear. An empty search result is a normal success and does not block the model from continuing another way.
-
-`sks init` installs two complementary Agent Skills. `sks-script-use` tells compatible agents to discover and reuse registered scripts before one-off programming, while `sks-script-create` teaches them to author, register, validate, and test new scripts. Existing config and skill files are preserved unless `--force` is supplied. The final tool decision still belongs to the MCP client and model: server instructions and Skills improve invocation behavior but cannot force it at the protocol level.
-
-## Picker
-
-`pick` shows the script name and comment in its result list:
-
-- `NAME`
-- `COMMENT`
-
-The preview pane renders the full script file with embedded `syntect` highlighting. The current default theme is GitHub Dark, with preview background handled by skim.
-
-## Run Semantics
-
-`run` is intentionally simple:
-
-```bash
-sks run example_script input.txt --mode fast
+```text
+sks://registry
+sks://scripts/<name>
+sks://scripts/<name>/source
 ```
 
-This means:
+Search results include the command form `sks run <name> [args...]`. `mcp.search_limit` controls the default result count from 1 to 10.
 
-1. find script `name: hello_world2`
-2. replace `{{path}}` in `command`
-3. append `input.txt --mode fast` to the command
+## Configuration
 
-`run` treats everything after `<name>` as passthrough arguments. It does not keep its own option parsing layer.
+Global file: `~/.config/sks/sks.yaml`
 
-Before launching the command, `run` copies the registered source file to `.sks/<filename>` in the current working directory, replacing an existing copy. This happens even when the script later exits unsuccessfully.
+```yaml
+mcp:
+  search_limit: 5
 
-`update` queries the GitHub latest Release, selects the asset matching the binary's compiled Rust target (including `gnu` or `musl`), verifies `checksums.txt`, and replaces the executable. Use `sks update --check` to check without installing.
+imports:
+  - scripts.yaml
+  - imports/tools.yaml
 
-## Install
-
-From source:
-
-```bash
-cargo install --path .
+scripts: []
 ```
+
+Script registration:
+
+```yaml
+scripts:
+  - name: ase_to_xyz
+    path: tools/ase2xyz.py
+    command: python {{path}}
+    comment: Convert ASE-readable structure files to extended XYZ
+    tags: [ase, structure, extxyz, conversion]
+```
+
+Rules:
+
+- `name` is required, case-sensitive, and globally unique.
+- A name must match `[A-Za-z_][A-Za-z0-9_]*`. Empty, Unicode, numeric-leading, dotted, dashed, slashed, and spaced names are invalid.
+- `path` must be a relative Unix-style path. It is resolved relative to the YAML file that defines it.
+- Only the global file may declare `imports`; imported files cannot import another file or declare `mcp`.
+- `command` must contain `{{path}}`. The placeholder is replaced with the resolved script path.
+- `comment` and `tags` are optional. Tags are used as search ranking hints.
+
+## Common Issues
+
+### `Global config not found`
+
+Run `sks init`, then add registrations to `~/.config/sks/sks.yaml` or an imported YAML file.
+
+### `invalid script name`
+
+Rename the registration to an ASCII Python-style identifier, for example `convert_csv` or `_internal`.
+
+### `unknown script name`
+
+Run `sks list` and use the exact registered name. Matching is case-sensitive and does not use fuzzy guessing.
+
+### `command` validation fails
+
+Add `{{path}}` to the command. For example: `python {{path}}`.
+
+### `sks update` cannot find an asset
+
+The release must provide an archive for the binary's compiled target and a matching `checksums.txt`. Check the network connection and the available assets on the latest GitHub Release.

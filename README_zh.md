@@ -1,84 +1,63 @@
 # sks
 
-一个极简的、基于注册表的脚本检索与执行 CLI。
+基于注册表的本地脚本启动器。`sks` 读取 YAML 注册项，提供脚本列表、检索、执行和 MCP 接口。
 
-## 概览
+## 核心功能
 
-`sks` 只读取一个全局配置文件：`~/.config/sks/sks.yaml`。  
-它不会扫描目录，也不会解析脚本头部元数据。
+- 使用 Python 风格 ASCII 名称精确执行脚本：`[A-Za-z_][A-Za-z0-9_]*`。
+- 支持 YAML 注册表、配置导入、描述和标签。
+- 交互式 Picker，支持源码预览和语法高亮。
+- 通过 MCP 提供脚本搜索、元数据和源码只读资源。
+- 执行前将脚本复制到当前目录的 `.sks/<文件名>`。
+- 从 GitHub 最新 Release 自更新，按编译目标选择资源并校验文件摘要。
+- 提供脚本使用和脚本创建的内置 Skill 指引。
 
-每个脚本注册项包含三个必填字段，并可添加描述与搜索标签：
+## 环境依赖
 
-- `name`
-- `path`
-- `command`
-- `comment`（可选描述）
-- `tags`（可选搜索词）
+- 从源码构建需要 Rust 1.85 或更高版本。
+- 每个注册脚本所需的运行时，例如 Python，由脚本自行决定。
+- 仅使用 MCP 集成时需要 MCP 客户端。
 
-`path` 相对于“定义它的 YAML 文件”解析。只有全局配置允许声明 `imports`。
+## 安装部署
 
-## 配置格式
+从源码构建并安装：
 
-全局配置：
-
-```yaml
-mcp:
-  search_limit: 5
-
-imports:
-  - lang/python.yaml
-
-scripts:
-  - name: hello_world
-    path: scripts/hello.py
-    command: python {{path}}
-    comment: 向用户问好
-    tags: [hello, text]
+```bash
+git clone https://github.com/gtiders/skillscripts.git
+cd skillscripts
+cargo install --path .
 ```
 
-被导入配置：
-
-```yaml
-scripts:
-  - name: build_tool
-    path: tools/build.py
-    command: python {{path}}
-```
-
-规则：
-
-- 只允许相对路径
-- 所有平台的注册表路径都必须使用 Unix 风格 `/` 分隔符
-- 配置始终位于 `~/.config/sks`，不会使用 AppData
-- imported 文件不能再声明 `imports`
-- `name` 必须符合 `[A-Za-z_][A-Za-z0-9_]*` 且全局唯一
-- `command` 必须包含 `{{path}}`
-
-## 命令
+初始化全局配置：
 
 ```bash
 sks init
-sks list
-sks pick
-sks run hello_world foo --bar baz
-sks mcp
-sks skill use
-sks skill create
-sks update --check
 ```
 
-- `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-use` 与 `sks-script-create` Agent Skills
-- `list` 以 YAML 输出所有已注册脚本
-- `pick` 打开交互式选择器，并显示表格化列表与语法高亮预览
-- `run <name> [args...]` 替换 `command` 中的 `{{path}}`，并把剩余参数全部追加到命令尾部
-- `mcp` 通过 stdio 启动本地 MCP server
-- `skill use` 打印如何使用已注册脚本
-- `skill create` 打印如何创建和注册脚本
-- `update` 为当前二进制的编译目标安装 GitHub 最新正式版本
+配置目录为 `~/.config/sks`。`init` 会创建 `sks.yaml`、空的 `scripts.yaml`，并将 `sks-script-use` 和 `sks-script-create` Agent Skill 安装到 `~/.agents/skills`。
 
-## MCP
+## 使用方法
 
-在 MCP 客户端中配置：
+```bash
+sks list
+sks pick
+sks run <name> [args...]
+sks skill use
+sks skill create
+sks update
+sks update --check
+sks update --force
+```
+
+`run` 按 `name` 精确匹配。名称后的所有参数都会追加到注册命令。执行前，脚本源文件会复制到当前目录的 `.sks/<文件名>`；同名文件直接覆盖。即使命令执行失败，复制也已经完成。
+
+`list` 以 YAML 输出完整注册表。`pick` 提供脚本名称、描述和源码预览。
+
+`update` 请求 GitHub 最新 Release，按二进制编译时的 Rust target（包括 GNU 或 musl）选择资源，校验 `checksums.txt` 后替换当前可执行文件。`--check` 只检查不安装；`--force` 在版本比较无法确认时仍执行安装。
+
+### MCP
+
+让 MCP 客户端通过 stdio 启动服务：
 
 ```json
 {
@@ -87,47 +66,69 @@ sks update --check
 }
 ```
 
-这个 MCP 是只读的。它只暴露一个由模型调用的 `search_scripts` 工具，以及注册表、脚本元数据和源码 resources。搜索复用 picker 的 skim 模糊匹配器，以自然语言 query 负责召回；可选 tags 只是排序加权信号，不再作为必需过滤条件。主配置中的 `mcp.search_limit` 可以把默认结果数量设置为 1–10，默认值是 5；单次工具调用仍可用 `limit` 临时覆盖。imported 配置不能声明 MCP 选项。每次请求都会重新读取注册表，因此修改 YAML 后无需重启 server，下一次搜索即可看到变化。
+服务提供 `search_scripts` 和以下只读资源：
 
-MCP 指令采用“先搜索、后新写”的触发策略：当任务可以通过脚本执行时，模型应在编写临时代码或 shell 命令前搜索一次，即使用户没有提到 sks、本地脚本或已有工具。计算、格式转换、文件与数据处理、内容生成、校验和构建流程都会触发；纯概念讨论则不触发。任何明确要求“使用脚本”的请求都必须先搜索，不因任务看起来简单或临时编写代码更快而跳过。工具同时声明为只读、幂等且不访问外部世界，以降低模型对试探性调用的风险判断。
-
-找到脚本后，结果会提供 `sks run <name> [args...]` 和资源 URI；参数不清楚时，模型可以按需读取源码。没有匹配项是正常的成功结果，不会阻止模型换用其他方式继续工作。
-
-`sks init` 安装两个互补的 Agent Skills：`sks-script-use` 让兼容代理在一次性编程前主动发现并复用已有脚本，`sks-script-create` 指导代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。最终是否调用工具仍由 MCP 客户端和模型决定；服务器说明与 Skill 会显著增强触发倾向，但不能从协议层强制调用。
-
-## Picker
-
-`pick` 的结果列表显示脚本名称和描述：
-
-- `NAME`
-- `COMMENT`
-
-右侧预览区会直接渲染完整脚本文件内容，并使用内嵌 `syntect` 做语法高亮。当前默认主题是 GitHub Dark，预览背景由 skim 控制。
-
-## run 语义
-
-`run` 的设计是刻意保持极简：
-
-```bash
-sks run example_script input.txt --mode fast
+```text
+sks://registry
+sks://scripts/<name>
+sks://scripts/<name>/source
 ```
 
-它的行为是：
+搜索结果包含 `sks run <name> [args...]`。`mcp.search_limit` 设置默认结果数量，范围为 1–10。
 
-1. 找到 `name: hello_world2`
-2. 替换 `command` 中的 `{{path}}`
-3. 把 `input.txt --mode fast` 原样追加到命令后面
+## 配置说明
 
-也就是说，`run` 在 `<name>` 之后不再保留自己的选项解析层。
+全局配置文件：`~/.config/sks/sks.yaml`
 
-`run` 启动命令前会把注册脚本复制到当前执行目录的 `.sks/<原文件名>`，同名文件直接覆盖；即使脚本之后执行失败，复制也已经完成。
+```yaml
+mcp:
+  search_limit: 5
 
-`update` 会查询 GitHub 最新 Release，根据当前二进制编译时的 Rust target（包括 `gnu` 或 `musl`）选择资产，校验 `checksums.txt` 后替换当前可执行文件。使用 `sks update --check` 可以只检查而不安装。
+imports:
+  - scripts.yaml
+  - imports/tools.yaml
 
-## 安装
-
-从源码安装：
-
-```bash
-cargo install --path .
+scripts: []
 ```
+
+脚本注册示例：
+
+```yaml
+scripts:
+  - name: ase_to_xyz
+    path: tools/ase2xyz.py
+    command: python {{path}}
+    comment: 将 ASE 可读取的结构文件转换为 extended XYZ
+    tags: [ase, structure, extxyz, conversion]
+```
+
+规则：
+
+- `name` 必填、大小写敏感，且全局唯一。
+- 名称必须匹配 `[A-Za-z_][A-Za-z0-9_]*`。空字符串、Unicode 字符、数字开头、点号、连字符、斜杠和空格均非法。
+- `path` 必须是相对 Unix 风格路径，相对于定义它的 YAML 文件解析。
+- 只有全局配置可以声明 `imports`；被导入文件不能继续导入，也不能声明 `mcp`。
+- `command` 必须包含 `{{path}}`，运行时替换为解析后的脚本路径。
+- `comment` 和 `tags` 可选。标签用于搜索排序加权。
+
+## 常见问题
+
+### `Global config not found`
+
+先运行 `sks init`，再向 `~/.config/sks/sks.yaml` 或导入的 YAML 文件添加注册项。
+
+### `invalid script name`
+
+将名称改为 ASCII Python 风格标识符，例如 `convert_csv` 或 `_internal`。
+
+### `unknown script name`
+
+运行 `sks list` 查看已注册名称，并使用完全一致的名称。匹配区分大小写，不进行模糊猜测。
+
+### `command` 校验失败
+
+在命令中加入 `{{path}}`，例如 `python {{path}}`。
+
+### `sks update` 找不到资源
+
+Release 必须提供与当前二进制编译目标对应的压缩包以及匹配的 `checksums.txt`。检查网络连接和 GitHub 最新 Release 的资源列表。

@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-05
+
+### Changed
+
+- Reworked the project documentation and repository guidance for the named-script registry, MCP integration, self-update flow, and built-in Skills.
+- This release continues the incompatible configuration format introduced by the Python-style script names; numeric `id` fields are not supported.
+
 ## [1.2.9] - 2026-09-05
 
 ### Fixed
