@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-09-05
+
+### Added
+
+- Added `sks skill use` and `sks skill create` guidance commands.
+- Added pre-execution script snapshots under `.sks/` and target-aware GitHub release updates with checksum verification.
+
 ## [1.2.5] - 2026-09-04
 
 ### Changed
@@ -17,7 +24,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Added an installable `sks-script-discovery` Agent Skill for search-before-authoring behavior.
+- Added installable `sks-script-use` and `sks-script-create` Agent Skills for script reuse and authoring guidance.
 
 ### Changed
 
@@ -29,7 +36,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 - Added a read-only stdio MCP server with fuzzy `search_scripts` discovery and script resources.
 - Added optional script tags and shared skim-based search text for the picker and MCP.
-- Added installation of the portable `sks-script-authoring` Agent Skill during `sks init`.
+- Added installation of the portable `sks-script-create` Agent Skill during `sks init`.
 
 ### Changed
 

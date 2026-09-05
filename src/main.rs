@@ -6,6 +6,8 @@ mod portable_path;
 mod registry;
 mod run_command;
 mod search;
+mod skill;
+mod update;
 
 use anyhow::Result;
 

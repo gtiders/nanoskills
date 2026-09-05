@@ -62,13 +62,19 @@ sks list
 sks pick
 sks run hello_world foo --bar baz
 sks mcp
+sks skill use
+sks skill create
+sks update --check
 ```
 
-- `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-discovery` 与 `sks-script-authoring` Agent Skills
+- `init` 创建 `~/.config/sks/sks.yaml`、空的 imported `scripts.yaml`，并向 `~/.agents/skills` 安装 `sks-script-use` 与 `sks-script-create` Agent Skills
 - `list` 以 YAML 输出所有已注册脚本
 - `pick` 打开交互式选择器，并显示表格化列表与语法高亮预览
 - `run <name> [args...]` 替换 `command` 中的 `{{path}}`，并把剩余参数全部追加到命令尾部
 - `mcp` 通过 stdio 启动本地 MCP server
+- `skill use` 打印如何使用已注册脚本
+- `skill create` 打印如何创建和注册脚本
+- `update` 为当前二进制的编译目标安装 GitHub 最新正式版本
 
 ## MCP
 
@@ -87,7 +93,7 @@ MCP 指令采用“先搜索、后新写”的触发策略：当任务可以通�
 
 找到脚本后，结果会提供 `sks run <name> [args...]` 和资源 URI；参数不清楚时，模型可以按需读取源码。没有匹配项是正常的成功结果，不会阻止模型换用其他方式继续工作。
 
-`sks init` 安装两个互补的 Agent Skills：`sks-script-discovery` 让兼容代理在一次性编程前主动发现并复用已有脚本，`sks-script-authoring` 指导代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。最终是否调用工具仍由 MCP 客户端和模型决定；服务器说明与 Skill 会显著增强触发倾向，但不能从协议层强制调用。
+`sks init` 安装两个互补的 Agent Skills：`sks-script-use` 让兼容代理在一次性编程前主动发现并复用已有脚本，`sks-script-create` 指导代理编写、注册、验证和测试新脚本。已有配置和 Skill 默认保留，只有使用 `--force` 时才覆盖。最终是否调用工具仍由 MCP 客户端和模型决定；服务器说明与 Skill 会显著增强触发倾向，但不能从协议层强制调用。
 
 ## Picker
 
@@ -113,6 +119,10 @@ sks run example_script input.txt --mode fast
 3. 把 `input.txt --mode fast` 原样追加到命令后面
 
 也就是说，`run` 在 `<name>` 之后不再保留自己的选项解析层。
+
+`run` 启动命令前会把注册脚本复制到当前执行目录的 `.sks/<原文件名>`，同名文件直接覆盖；即使脚本之后执行失败，复制也已经完成。
+
+`update` 会查询 GitHub 最新 Release，根据当前二进制编译时的 Rust target（包括 `gnu` 或 `musl`）选择资产，校验 `checksums.txt` 后替换当前可执行文件。使用 `sks update --check` 可以只检查而不安装。
 
 ## 安装
 

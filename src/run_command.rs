@@ -1,6 +1,7 @@
 use crate::registry::{PATH_PLACEHOLDER, ScriptName, display_path, load_skills};
 use anyhow::{Context, Result, anyhow, bail};
 use std::ffi::OsString;
+use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
 use std::str::FromStr;
@@ -52,6 +53,7 @@ pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
     }
 
     let program = parts.remove(0);
+    copy_to_workspace(&skill.path)?;
     println!(
         "Running: {}",
         format_command_line(&program, &parts, &invocation.args)
@@ -79,6 +81,25 @@ pub(crate) fn execute(invocation: RunInvocation) -> Result<()> {
         );
     }
 
+    Ok(())
+}
+
+fn copy_to_workspace(path: &std::path::Path) -> Result<()> {
+    let directory = std::env::current_dir()?.join(".sks");
+    fs::create_dir_all(&directory)
+        .with_context(|| format!("failed to create {}", directory.display()))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow!("registered script has no file name: {}", path.display()))?;
+    let destination = directory.join(file_name);
+    fs::copy(path, &destination).with_context(|| {
+        format!(
+            "failed to copy script {} to {}",
+            path.display(),
+            destination.display()
+        )
+    })?;
+    println!("Copied: {}", destination.display());
     Ok(())
 }
 

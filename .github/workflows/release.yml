@@ -78,3 +78,20 @@ jobs:
           tar: all
           zip: all
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  checksums:
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir assets
+          gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --dir assets --pattern 'sks-*'
+      - name: Generate checksums
+        run: sha256sum assets/sks-* > checksums.txt
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" checksums.txt --repo "${GITHUB_REPOSITORY}" --clobber

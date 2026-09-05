@@ -1,17 +1,12 @@
 use crate::portable_path::agent_skills_dir;
+use crate::skill::{CREATE_SKILL, USE_SKILL};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 
 const BUILTIN_SKILLS: &[(&str, &str)] = &[
-    (
-        "sks-script-discovery",
-        include_str!("../assets/skills/sks-script-discovery/SKILL.md"),
-    ),
-    (
-        "sks-script-authoring",
-        include_str!("../assets/skills/sks-script-authoring/SKILL.md"),
-    ),
+    ("sks-script-use", USE_SKILL),
+    ("sks-script-create", CREATE_SKILL),
 ];
 
 pub(crate) struct SkillInstall {

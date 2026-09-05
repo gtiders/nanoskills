@@ -62,13 +62,19 @@ sks list
 sks pick
 sks run hello_world foo --bar baz
 sks mcp
+sks skill use
+sks skill create
+sks update --check
 ```
 
-- `init` creates `~/.config/sks/sks.yaml`, an empty imported `scripts.yaml`, and the `sks-script-discovery` and `sks-script-authoring` Agent Skills under `~/.agents/skills`
+- `init` creates `~/.config/sks/sks.yaml`, an empty imported `scripts.yaml`, and the `sks-script-use` and `sks-script-create` Agent Skills under `~/.agents/skills`
 - `list` outputs all registered scripts as YAML
 - `pick` opens the interactive picker with a table-style list and syntax-highlighted file preview
 - `run <name> [args...]` replaces `{{path}}` in `command` and appends all remaining args
 - `mcp` runs a local MCP server over stdio
+- `skill use` prints instructions for using registered scripts
+- `skill create` prints instructions for creating and registering scripts
+- `update` installs the latest GitHub release for this binary's compiled target
 
 ## MCP
 
@@ -87,7 +93,7 @@ The MCP instructions use a search-before-authoring policy: for executable tasks,
 
 When a match is found, the result includes `sks run <name> [args...]` and resource URIs. The model can inspect source when arguments are unclear. An empty search result is a normal success and does not block the model from continuing another way.
 
-`sks init` installs two complementary Agent Skills. `sks-script-discovery` tells compatible agents to discover and reuse registered scripts before one-off programming, while `sks-script-authoring` teaches them to author, register, validate, and test new scripts. Existing config and skill files are preserved unless `--force` is supplied. The final tool decision still belongs to the MCP client and model: server instructions and Skills improve invocation behavior but cannot force it at the protocol level.
+`sks init` installs two complementary Agent Skills. `sks-script-use` tells compatible agents to discover and reuse registered scripts before one-off programming, while `sks-script-create` teaches them to author, register, validate, and test new scripts. Existing config and skill files are preserved unless `--force` is supplied. The final tool decision still belongs to the MCP client and model: server instructions and Skills improve invocation behavior but cannot force it at the protocol level.
 
 ## Picker
 
@@ -113,6 +119,10 @@ This means:
 3. append `input.txt --mode fast` to the command
 
 `run` treats everything after `<name>` as passthrough arguments. It does not keep its own option parsing layer.
+
+Before launching the command, `run` copies the registered source file to `.sks/<filename>` in the current working directory, replacing an existing copy. This happens even when the script later exits unsuccessfully.
+
+`update` queries the GitHub latest Release, selects the asset matching the binary's compiled Rust target (including `gnu` or `musl`), verifies `checksums.txt`, and replaces the executable. Use `sks update --check` to check without installing.
 
 ## Install
 

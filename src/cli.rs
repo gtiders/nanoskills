@@ -3,6 +3,8 @@ use crate::mcp;
 use crate::picker::run_skim_picker;
 use crate::registry::{display_path, global_config_dir, init_global_config, load_skills};
 use crate::run_command;
+use crate::skill;
+use crate::update;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -33,6 +35,29 @@ enum Commands {
     Pick,
     #[command(about = "Run the local MCP server over stdio")]
     Mcp,
+    #[command(about = "Print instructions for using or creating sks scripts")]
+    Skill {
+        #[command(subcommand)]
+        command: SkillCommands,
+    },
+    #[command(about = "Update sks from the latest GitHub release")]
+    Update {
+        #[arg(long, help = "Only check for an update without installing it")]
+        check: bool,
+        #[arg(
+            long,
+            help = "Install latest release even if version comparison is inconclusive"
+        )]
+        force: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum SkillCommands {
+    #[command(about = "Print how to use registered scripts")]
+    Use,
+    #[command(about = "Print how to create and register a script")]
+    Create,
 }
 
 pub(crate) fn run() -> Result<()> {
@@ -46,6 +71,11 @@ pub(crate) fn run() -> Result<()> {
         Some(Commands::Init { force }) => run_init(force),
         Some(Commands::List) => run_list(),
         Some(Commands::Mcp) => mcp::run(),
+        Some(Commands::Skill { command }) => match command {
+            SkillCommands::Use => skill::print_use(),
+            SkillCommands::Create => skill::print_create(),
+        },
+        Some(Commands::Update { check, force }) => update::run(check, force),
     }
 }
 

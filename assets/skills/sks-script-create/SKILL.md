@@ -1,9 +1,9 @@
 ---
-name: sks-script-authoring
+name: sks-script-create
 description: Create, register, update, and validate reusable local scripts managed by sks. Use when writing automation for the user, adding a script to the sks MCP registry, choosing useful script tags and descriptions, or troubleshooting an sks registration.
 ---
 
-# Author an sks script
+# Create an sks script
 
 1. Call the sks MCP `search_scripts` tool before creating a script so existing automation is reused.
 2. Choose the YAML registry and a nearby scripts directory.

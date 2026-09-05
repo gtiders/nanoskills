@@ -93,14 +93,14 @@ fn init_creates_global_config() {
         fs::read_to_string(env.imported_scripts_file()).unwrap(),
         "scripts: []\n"
     );
-    let authoring_skill = fs::read_to_string(env.installed_skill_file("sks-script-authoring"))
+    let create_skill = fs::read_to_string(env.installed_skill_file("sks-script-create"))
         .expect("authoring skill should be installed");
-    assert!(authoring_skill.contains("name: sks-script-authoring"));
-    assert!(authoring_skill.contains("sks run <name> [args...]"));
-    let discovery_skill = fs::read_to_string(env.installed_skill_file("sks-script-discovery"))
+    assert!(create_skill.contains("name: sks-script-create"));
+    assert!(create_skill.contains("sks run <name> [args...]"));
+    let use_skill = fs::read_to_string(env.installed_skill_file("sks-script-use"))
         .expect("discovery skill should be installed");
-    assert!(discovery_skill.contains("name: sks-script-discovery"));
-    assert!(discovery_skill.contains("every request to use a script"));
+    assert!(use_skill.contains("name: sks-script-use"));
+    assert!(use_skill.contains("every request to use a script"));
     env.command(&workspace).arg("list").assert().success();
 }
 
@@ -121,8 +121,8 @@ fn init_keeps_existing_config_and_installs_missing_skill() {
         fs::read_to_string(env.global_config_file()).unwrap(),
         "scripts: []\n"
     );
-    assert!(env.installed_skill_file("sks-script-authoring").is_file());
-    assert!(env.installed_skill_file("sks-script-discovery").is_file());
+    assert!(env.installed_skill_file("sks-script-create").is_file());
+    assert!(env.installed_skill_file("sks-script-use").is_file());
 }
 
 #[test]
@@ -177,8 +177,8 @@ fn init_uses_userprofile_dot_directories_when_home_is_unset() {
         .success();
 
     assert!(env.global_config_file().is_file());
-    assert!(env.installed_skill_file("sks-script-authoring").is_file());
-    assert!(env.installed_skill_file("sks-script-discovery").is_file());
+    assert!(env.installed_skill_file("sks-script-create").is_file());
+    assert!(env.installed_skill_file("sks-script-use").is_file());
     assert!(!env.home.join("AppData").exists());
 }
 
@@ -640,6 +640,25 @@ scripts:
         .stdout(predicate::str::contains("ARG=one"))
         .stdout(predicate::str::contains("ARG=--flag"))
         .stdout(predicate::str::contains("ARG=three"));
+    assert!(workspace.join(".sks").join(script_name).is_file());
+}
+
+#[test]
+fn skill_commands_print_the_embedded_guides() {
+    let env = TestEnv::new();
+    let workspace = env.root().join("workspace-skill");
+    fs::create_dir_all(&workspace).unwrap();
+
+    env.command(&workspace)
+        .args(["skill", "use"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("name: sks-script-use"));
+    env.command(&workspace)
+        .args(["skill", "create"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("name: sks-script-create"));
 }
 
 #[test]
